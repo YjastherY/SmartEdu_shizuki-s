@@ -32,7 +32,6 @@ SmartEdu is a local MVP of an educational platform for online courses, video les
 
 ## Local Setup
 
-> This machine currently has Node.js but no global `npm` command available. Install Node.js from https://nodejs.org or use any Node distribution that includes npm before running the commands below.
 
 1. Start PostgreSQL:
 
