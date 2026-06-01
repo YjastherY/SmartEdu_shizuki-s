@@ -75,12 +75,16 @@ model Lesson {
 }
 
 model Test {
-  id          String        @id @default(cuid())
-  title       String
-  lessonId    String        @unique
-  lesson      Lesson        @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  questions   Question[]
-  attempts    TestAttempt[]
+  id               String        @id @default(cuid())
+  title            String
+  description      String?
+  attemptLimit     Int           @default(2)
+  timeLimitMinutes Int           @default(15)
+  deadline         DateTime?
+  lessonId         String        @unique
+  lesson           Lesson        @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  questions        Question[]
+  attempts         TestAttempt[]
 }
 
 model Question {

@@ -15,11 +15,13 @@ async function updateCourseProgress(userId, courseId) {
   const completedLessons = await prisma.lessonCompletion.count({
     where: { userId, lesson: { module: { courseId } } }
   });
-  const attempts = await prisma.testAttempt.findMany({
-    where: { userId, test: { lesson: { module: { courseId } } } }
+  const attempts = await prisma.testAttempt.groupBy({
+    by: ["testId"],
+    where: { userId, test: { lesson: { module: { courseId } } } },
+    _max: { score: true }
   });
   const averageScore = attempts.length
-    ? Math.round(attempts.reduce((sum, attempt) => sum + attempt.score, 0) / attempts.length)
+    ? Math.round(attempts.reduce((sum, attempt) => sum + (attempt._max.score || 0), 0) / attempts.length)
     : 0;
   const percent = totalLessons ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
@@ -45,6 +47,18 @@ router.post(
 
     if (!test) {
       return res.status(404).json({ message: "Test not found" });
+    }
+
+    if (test.deadline && new Date() > test.deadline) {
+      return res.status(403).json({ message: "Test deadline has passed" });
+    }
+
+    const attemptCount = await prisma.testAttempt.count({
+      where: { userId: req.user.id, testId: test.id }
+    });
+
+    if (test.attemptLimit && attemptCount >= test.attemptLimit) {
+      return res.status(403).json({ message: "No attempts left" });
     }
 
     const correct = test.questions.filter((question) => {
@@ -75,7 +89,14 @@ router.post(
       });
     }
 
-    res.json({ score, correct, total: test.questions.length, progress });
+    const attempts = await prisma.testAttempt.findMany({
+      where: { userId: req.user.id, testId: test.id },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, score: true, createdAt: true }
+    });
+    const bestScore = Math.max(...attempts.map((attempt) => attempt.score));
+
+    res.json({ score, bestScore, attempts, correct, total: test.questions.length, progress });
   })
 );
 

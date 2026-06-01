@@ -76,6 +76,10 @@ const courses = [
             test: {
               id: "test-1",
               title: "React Components Quiz",
+              description: "Короткий тест по компонентам React. Засчитывается лучший результат.",
+              attemptLimit: 2,
+              timeLimitMinutes: 10,
+              deadline: "2026-12-31T20:59:59.000Z",
               questions: [
                 {
                   id: "question-1",
@@ -191,9 +195,14 @@ function updateProgress(state, courseId) {
   const completedLessons = state.completedLessons.filter((lessonId) =>
     course.modules.some((module) => module.lessons.some((lesson) => lesson.id === lessonId))
   ).length;
-  const averageScore = state.attempts.length
-    ? Math.round(state.attempts.reduce((sum, item) => sum + item.score, 0) / state.attempts.length)
-    : 0;
+  const bestScores = Object.values(
+    state.attempts.reduce((best, item) => {
+      if (!item.testId) return best;
+      best[item.testId] = Math.max(best[item.testId] || 0, item.score);
+      return best;
+    }, {})
+  );
+  const averageScore = bestScores.length ? Math.round(bestScores.reduce((sum, score) => sum + score, 0) / bestScores.length) : 0;
   const percent = Math.round((completedLessons / totalLessons) * 100);
   const nextProgress = {
     id: `progress-${courseId}`,
@@ -244,21 +253,44 @@ export async function mockApi(path, options = {}) {
   if (path.startsWith("/lessons/")) {
     const lesson = findLesson(path.split("/").at(-1));
     if (!lesson) throw new Error("Lesson not found");
+    if (lesson.test) {
+      const attempts = state.attempts.filter((attempt) => attempt.testId === lesson.test.id);
+      lesson.test = {
+        ...lesson.test,
+        attempts,
+        bestScore: attempts.length ? Math.max(...attempts.map((attempt) => attempt.score)) : null
+      };
+    }
     return { lesson };
   }
   if (path.startsWith("/tests/") && path.endsWith("/submit")) {
     const testId = path.split("/")[2];
     const lesson = courses.flatMap((course) => course.modules).flatMap((module) => module.lessons).find((item) => item.test?.id === testId);
+    const attempts = state.attempts.filter((attempt) => attempt.testId === testId);
+    if (lesson.test.deadline && new Date() > new Date(lesson.test.deadline)) {
+      throw new Error("Срок сдачи теста истёк");
+    }
+    if (lesson.test.attemptLimit && attempts.length >= lesson.test.attemptLimit) {
+      throw new Error("Попытки закончились");
+    }
     const correct = lesson.test.questions.filter((question) =>
       question.answers.some((answer) => answer.id === body.answers[question.id] && answer.isCorrect)
     ).length;
     const score = Math.round((correct / lesson.test.questions.length) * 100);
-    state.attempts.unshift({ id: `attempt-${Date.now()}`, score, test: lesson.test });
+    state.attempts.unshift({
+      id: `attempt-${Date.now()}`,
+      testId,
+      score,
+      createdAt: new Date().toISOString(),
+      test: lesson.test
+    });
     if (!state.completedLessons.includes(lesson.id)) state.completedLessons.push(lesson.id);
     const course = courses.find((item) => item.modules.some((module) => module.lessons.some((candidate) => candidate.id === lesson.id)));
     const progress = updateProgress(state, course.id);
+    const nextAttempts = state.attempts.filter((attempt) => attempt.testId === testId);
+    const bestScore = Math.max(...nextAttempts.map((attempt) => attempt.score));
     saveState(state);
-    return { score, correct, total: lesson.test.questions.length, progress };
+    return { score, bestScore, attempts: nextAttempts, correct, total: lesson.test.questions.length, progress };
   }
   if (path === "/progress/me") {
     return { progress: state.progress, certificates: state.certificates, attempts: state.attempts };

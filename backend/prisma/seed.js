@@ -83,6 +83,10 @@ async function main() {
                   test: {
                     create: {
                       title: "React Components Quiz",
+                      description: "Короткий тест по компонентам React. Засчитывается лучший результат.",
+                      attemptLimit: 2,
+                      timeLimitMinutes: 10,
+                      deadline: new Date("2026-12-31T20:59:59.000Z"),
                       questions: {
                         create: [
                           {

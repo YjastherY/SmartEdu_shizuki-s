@@ -15,14 +15,16 @@ async function refreshProgress(userId, courseId) {
       lesson: { module: { courseId } }
     }
   });
-  const attempts = await prisma.testAttempt.findMany({
+  const attempts = await prisma.testAttempt.groupBy({
+    by: ["testId"],
     where: {
       userId,
       test: { lesson: { module: { courseId } } }
-    }
+    },
+    _max: { score: true }
   });
   const averageScore = attempts.length
-    ? Math.round(attempts.reduce((sum, attempt) => sum + attempt.score, 0) / attempts.length)
+    ? Math.round(attempts.reduce((sum, attempt) => sum + (attempt._max.score || 0), 0) / attempts.length)
     : 0;
   const percent = totalLessons ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
@@ -43,6 +45,11 @@ router.get(
         module: { include: { course: true } },
         test: {
           include: {
+            attempts: {
+              where: { userId: req.user.id },
+              orderBy: { createdAt: "desc" },
+              select: { id: true, score: true, createdAt: true }
+            },
             questions: {
               include: {
                 answers: {
