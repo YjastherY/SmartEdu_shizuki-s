@@ -23,12 +23,12 @@ export default function NotificationBell() {
         )}
       </button>
       {open && (
-        <div className="absolute right-0 mt-2 w-80 rounded-lg border border-slate-200 bg-white p-3 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+        <div className="page-enter absolute right-0 mt-2 w-80 rounded-lg border border-slate-200 bg-white p-3 shadow-xl dark:border-slate-700 dark:bg-slate-900">
           <p className="mb-2 text-sm font-semibold">Уведомления</p>
           <div className="space-y-2">
             {notifications.length === 0 && <p className="text-sm text-slate-500">Пока пусто</p>}
             {notifications.slice(0, 5).map((item) => (
-              <div key={item.id} className="rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-800">
+              <div key={item.id} className="rounded-lg bg-slate-50 p-3 text-sm transition hover:-translate-y-0.5 dark:bg-slate-800">
                 <p className="font-semibold">{item.title}</p>
                 <p className="text-slate-500 dark:text-slate-300">{item.message}</p>
               </div>

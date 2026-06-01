@@ -16,12 +16,12 @@ export default function Sidebar({ open, onClose }) {
         onClick={onClose}
       />
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 border-r border-slate-200 bg-white px-4 py-5 transition-transform lg:translate-x-0 dark:border-slate-800 dark:bg-slate-900 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 border-r border-slate-200 bg-white/95 px-4 py-5 shadow-xl backdrop-blur transition-transform duration-300 lg:translate-x-0 lg:shadow-none dark:border-slate-800 dark:bg-slate-900/95 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         <div className="mb-8 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-600 text-white">
+          <div className="soft-ring flex h-10 w-10 items-center justify-center rounded-lg bg-brand-600 text-white">
             <GraduationCap size={24} />
           </div>
           <div>
@@ -38,7 +38,7 @@ export default function Sidebar({ open, onClose }) {
                 to={item.to}
                 onClick={onClose}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                  `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition duration-200 hover:translate-x-1 ${
                     isActive
                       ? "bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-100"
                       : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"

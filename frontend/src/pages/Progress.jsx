@@ -18,27 +18,27 @@ export default function Progress() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="page-enter space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Мой прогресс</h1>
         <p className="text-sm text-slate-500">Статистика обучения, тестов и сертификатов.</p>
       </div>
       <ProgressChart data={data.progress} />
       <section className="grid gap-6 lg:grid-cols-2">
-        <div className="panel">
+        <div className="panel hover:shadow-md">
           <div className="mb-4 flex items-center gap-2">
             <ClipboardCheck className="text-brand-600" />
             <h2 className="text-lg font-bold">Курсы</h2>
           </div>
           <div className="space-y-3">
             {data.progress.map((item) => (
-              <div key={item.id} className="rounded-lg border border-slate-200 p-4 dark:border-slate-700">
+              <div key={item.id} className="rounded-lg border border-slate-200 p-4 transition hover:-translate-y-0.5 hover:border-brand-300 dark:border-slate-700">
                 <div className="flex justify-between gap-4">
                   <p className="font-semibold">{item.course.title}</p>
                   <p className="text-sm font-semibold text-brand-600">{item.percent}%</p>
                 </div>
                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                  <div className="h-full bg-brand-600" style={{ width: `${item.percent}%` }} />
+                  <div className="h-full rounded-full bg-brand-600 transition-all duration-700" style={{ width: `${item.percent}%` }} />
                 </div>
                 <p className="mt-2 text-sm text-slate-500">
                   Уроки: {item.completedLessons}/{item.totalLessons}. Средний балл: {item.averageScore}%
@@ -47,7 +47,7 @@ export default function Progress() {
             ))}
           </div>
         </div>
-        <div className="panel">
+        <div className="panel hover:shadow-md">
           <div className="mb-4 flex items-center gap-2">
             <Award className="text-amber-500" />
             <h2 className="text-lg font-bold">Сертификаты</h2>

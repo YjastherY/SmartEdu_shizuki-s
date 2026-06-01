@@ -26,9 +26,9 @@ export default function Register() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 dark:bg-slate-950">
-      <form className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900" onSubmit={handleSubmit}>
+      <form className="page-enter w-full max-w-md rounded-lg border border-slate-200 bg-white/95 p-6 shadow-xl backdrop-blur dark:border-slate-800 dark:bg-slate-900/95" onSubmit={handleSubmit}>
         <div className="mb-6 flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-brand-600 text-white">
+          <div className="soft-ring flex h-11 w-11 items-center justify-center rounded-lg bg-brand-600 text-white">
             <GraduationCap />
           </div>
           <div>

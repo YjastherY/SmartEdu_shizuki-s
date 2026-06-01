@@ -36,14 +36,14 @@ export default function Lesson() {
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
+    <div className="page-enter grid gap-6 xl:grid-cols-[1fr_360px]">
       <section className="space-y-5">
         <div>
           <p className="text-sm text-slate-500">{lesson.module.course.title} / {lesson.module.title}</p>
           <h1 className="text-2xl font-bold">{lesson.title}</h1>
         </div>
         {lesson.type === "VIDEO" && <LessonPlayer lesson={lesson} />}
-        <div className="panel">
+        <div className="panel hover:shadow-md">
           <p className="text-slate-600 dark:text-slate-300">{lesson.content}</p>
           {lesson.type !== "TEST" && (
             <button className="btn-primary mt-4" onClick={markComplete}>Отметить урок пройденным</button>
@@ -62,7 +62,7 @@ export default function Lesson() {
           <div className="mt-4 space-y-3">
             {lesson.comments.length === 0 && <p className="text-sm text-slate-500">Комментариев пока нет.</p>}
             {lesson.comments.map((item) => (
-              <div key={item.id} className="rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-800">
+              <div key={item.id} className="rounded-lg bg-slate-50 p-3 text-sm transition hover:-translate-y-0.5 dark:bg-slate-800">
                 <p className="font-semibold">{item.user.name}</p>
                 <p className="text-slate-500 dark:text-slate-300">{item.text}</p>
               </div>

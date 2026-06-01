@@ -23,7 +23,7 @@ export default function Courses() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="page-enter space-y-6">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
           <h1 className="text-2xl font-bold">Каталог курсов</h1>
@@ -43,7 +43,11 @@ export default function Courses() {
         <div className="panel text-sm text-slate-500">Загружаем курсы...</div>
       ) : (
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((course) => <CourseCard key={course.id} course={course} />)}
+          {filtered.map((course, index) => (
+            <div key={course.id} style={{ animationDelay: `${index * 70}ms` }} className="page-enter">
+              <CourseCard course={course} />
+            </div>
+          ))}
         </div>
       )}
     </div>

@@ -19,7 +19,7 @@ export default function Dashboard() {
   const average = progress.length ? Math.round(progress.reduce((sum, item) => sum + item.averageScore, 0) / progress.length) : 0;
 
   return (
-    <div className="space-y-6">
+    <div className="page-enter space-y-6">
       <section className="grid gap-4 md:grid-cols-3">
         <Stat icon={BookOpen} label="Курсы" value={courses.length} />
         <Stat icon={CheckCircle2} label="Завершенные уроки" value={completed} />
@@ -48,8 +48,8 @@ export default function Dashboard() {
 
 function Stat({ icon: Icon, label, value }) {
   return (
-    <div className="panel flex items-center gap-4">
-      <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-100">
+    <div className="panel group flex items-center gap-4 hover:-translate-y-1 hover:shadow-md">
+      <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-brand-50 text-brand-700 transition group-hover:scale-105 dark:bg-brand-950 dark:text-brand-100">
         <Icon />
       </div>
       <div>

@@ -13,10 +13,10 @@ export default function Profile() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-      <aside className="panel text-center">
+    <div className="page-enter grid gap-6 lg:grid-cols-[320px_1fr]">
+      <aside className="panel text-center hover:shadow-md">
         <img
-          className="mx-auto h-28 w-28 rounded-full object-cover"
+          className="mx-auto h-28 w-28 rounded-full object-cover ring-4 ring-brand-50 transition hover:scale-105 dark:ring-brand-950"
           src={user.avatarUrl || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(user.name)}`}
           alt={user.name}
         />
@@ -26,7 +26,7 @@ export default function Profile() {
           {user.role}
         </span>
       </aside>
-      <form className="panel space-y-4" onSubmit={handleSubmit}>
+      <form className="panel space-y-4 hover:shadow-md" onSubmit={handleSubmit}>
         <div>
           <h2 className="text-xl font-bold">Настройки профиля</h2>
           <p className="text-sm text-slate-500">Измените имя и ссылку на аватар.</p>

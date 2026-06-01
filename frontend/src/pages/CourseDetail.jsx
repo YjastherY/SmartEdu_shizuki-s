@@ -21,9 +21,9 @@ export default function CourseDetail() {
   }
 
   return (
-    <div className="space-y-6">
-      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-        <img className="h-64 w-full object-cover" src={course.imageUrl} alt={course.title} />
+    <div className="page-enter space-y-6">
+      <section className="polished-card group">
+        <img className="h-64 w-full object-cover transition duration-700 group-hover:scale-105" src={course.imageUrl} alt={course.title} />
         <div className="p-6">
           <div className="mb-3 flex flex-wrap gap-2 text-xs">
             <span className="rounded-full bg-brand-50 px-2 py-1 font-semibold text-brand-700 dark:bg-brand-950 dark:text-brand-100">{course.category}</span>
@@ -37,23 +37,23 @@ export default function CourseDetail() {
       <section className="space-y-4">
         <h2 className="text-xl font-bold">Модули и уроки</h2>
         {course.modules.map((module) => (
-          <div key={module.id} className="panel">
+          <div key={module.id} className="panel hover:shadow-md">
             <h3 className="font-bold">{module.order}. {module.title}</h3>
             <div className="mt-4 space-y-2">
               {module.lessons.map((lesson) => (
                 <Link
                   key={lesson.id}
-                  className="flex items-center justify-between rounded-lg border border-slate-200 p-3 transition hover:border-brand-500 dark:border-slate-700"
+                  className="group flex items-center justify-between rounded-lg border border-slate-200 p-3 transition duration-200 hover:-translate-y-0.5 hover:border-brand-500 hover:bg-brand-50/40 dark:border-slate-700 dark:hover:bg-brand-950/20"
                   to={`/lessons/${lesson.id}`}
                 >
                   <span className="flex items-center gap-3">
-                    {lesson.type === "TEST" ? <CheckCircle2 className="text-emerald-500" /> : <PlayCircle className="text-brand-600" />}
+                    {lesson.type === "TEST" ? <CheckCircle2 className="text-emerald-500 transition group-hover:scale-110" /> : <PlayCircle className="text-brand-600 transition group-hover:scale-110" />}
                     <span>
                       <span className="block font-medium">{lesson.title}</span>
                       <span className="text-sm text-slate-500">{lesson.duration}</span>
                     </span>
                   </span>
-                  <span className="text-sm text-brand-600">Открыть</span>
+                  <span className="text-sm text-brand-600 transition group-hover:translate-x-1">Открыть</span>
                 </Link>
               ))}
             </div>
