@@ -222,6 +222,11 @@ export async function mockApi(path, options = {}) {
 
   if (path === "/me") return { user: state.user };
   if (path === "/notifications") return { notifications: state.notifications };
+  if (path === "/notifications/read-all") {
+    state.notifications = state.notifications.map((item) => ({ ...item, read: true }));
+    saveState(state);
+    return { notifications: state.notifications };
+  }
   if (path === "/courses") return { courses };
   if (path.startsWith("/courses/")) {
     const course = courses.find((item) => item.id === path.split("/").at(-1));

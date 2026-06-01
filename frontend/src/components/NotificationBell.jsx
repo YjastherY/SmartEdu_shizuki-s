@@ -12,9 +12,18 @@ export default function NotificationBell() {
 
   const unread = notifications.filter((item) => !item.read).length;
 
+  async function toggleOpen() {
+    setOpen((value) => !value);
+
+    if (unread > 0) {
+      setNotifications((items) => items.map((item) => ({ ...item, read: true })));
+      await api("/notifications/read-all", { method: "PATCH" }).catch(() => {});
+    }
+  }
+
   return (
     <div className="relative">
-      <button className="btn-secondary relative px-3" onClick={() => setOpen((value) => !value)} aria-label="Уведомления">
+      <button className="btn-secondary relative px-3" onClick={toggleOpen} aria-label="Уведомления">
         <Bell size={18} />
         {unread > 0 && (
           <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-xs text-white">

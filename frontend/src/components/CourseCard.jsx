@@ -15,7 +15,7 @@ export default function CourseCard({ course }) {
       </div>
       <div className="p-5">
         <div className="mb-3 flex flex-wrap gap-2 text-xs">
-          <span className="rounded-full bg-brand-50 px-2 py-1 font-semibold text-brand-700 transition group-hover:bg-brand-100 dark:bg-brand-950 dark:text-brand-100">
+          <span className="rounded-full bg-brand-50 px-2 py-1 font-semibold text-brand-700 transition group-hover:bg-brand-100 dark:bg-brand-950 dark:text-brand-100 dark:group-hover:bg-brand-900 dark:group-hover:text-white">
             {course.category}
           </span>
           <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
