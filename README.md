@@ -63,6 +63,17 @@ npm run dev
 
 Frontend runs on `http://localhost:5173`.
 
+## Frontend-only Demo
+
+If Docker or PostgreSQL is not installed yet, run the UI with mock data:
+
+```bash
+cd frontend
+VITE_MOCK_API=true npm run dev
+```
+
+This mode supports login, course pages, lessons, tests, progress, comments, profile settings, notifications, and dark mode in the browser.
+
 ## Demo Account
 
 After running seed:
