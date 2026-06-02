@@ -195,11 +195,14 @@ const courses = [
 const studentInsights = {
   "user-1": {
     completed: ["Что такое компоненты", "Тест по компонентам"],
-    strengths: ["JSX", "props", "структура компонентов"],
-    weaknesses: ["роутинг", "управление состоянием"],
-    grades: [
-      { title: "React Components Quiz", score: 100, type: "Авто" },
-      { title: "Развернутый ответ", score: null, type: "На проверке" }
+    strengthsByCourse: [
+      { course: "React Start", topics: ["JSX", "props", "структура компонентов"] }
+    ],
+    focusByCourse: [
+      { course: "React Start", topics: ["роутинг", "управление состоянием"] }
+    ],
+    gradeTests: [
+      { title: "React Components Quiz", autoScore: 100, manualTitle: "Связь props и состояния" }
     ],
     recentAnswers: [
       { question: "Что возвращает React-компонент?", answer: "JSX-разметку", result: "Верно" },
@@ -208,11 +211,14 @@ const studentInsights = {
   },
   "user-4": {
     completed: ["Что такое компоненты"],
-    strengths: ["переиспользование компонентов"],
-    weaknesses: ["точность терминов", "состояние"],
-    grades: [
-      { title: "React Components Quiz", score: 78, type: "Авто" },
-      { title: "Развернутый ответ", score: null, type: "На проверке" }
+    strengthsByCourse: [
+      { course: "React Start", topics: ["переиспользование компонентов"] }
+    ],
+    focusByCourse: [
+      { course: "React Start", topics: ["точность терминов", "состояние"] }
+    ],
+    gradeTests: [
+      { title: "React Components Quiz", autoScore: 78, manualTitle: "Развернутый ответ по компонентам" }
     ],
     recentAnswers: [
       { question: "Что возвращает React-компонент?", answer: "UI-блок", result: "Частично" },
@@ -221,10 +227,14 @@ const studentInsights = {
   },
   "user-5": {
     completed: ["Первый API endpoint"],
-    strengths: ["HTTP методы", "структура endpoint"],
-    weaknesses: ["JWT", "Prisma relations"],
-    grades: [
-      { title: "Express Basics", score: 55, type: "Авто" }
+    strengthsByCourse: [
+      { course: "Backend API на Node.js", topics: ["HTTP методы", "структура endpoint"] }
+    ],
+    focusByCourse: [
+      { course: "Backend API на Node.js", topics: ["JWT", "Prisma relations"] }
+    ],
+    gradeTests: [
+      { title: "Express Basics", autoScore: 55 }
     ],
     recentAnswers: [
       { question: "Что делает Express?", answer: "Создает HTTP API", result: "Верно" },
@@ -232,6 +242,28 @@ const studentInsights = {
     ]
   }
 };
+
+function buildGrades(state, studentId, insight) {
+  return (insight.gradeTests || []).map((grade) => {
+    const manualSubmission = state.manualSubmissions.find((item) => item.studentId === studentId && (!grade.manualTitle || item.testTitle === grade.manualTitle));
+    const details = [{ label: "Автопроверка", value: `${grade.autoScore}%` }];
+    if (grade.manualTitle) {
+      details.push({
+        label: "Развернутый ответ",
+        value: manualSubmission
+          ? manualSubmission.status === "PENDING"
+            ? "На проверке"
+            : `${manualSubmission.score} из ${manualSubmission.maxScore}`
+          : "Нет ответа"
+      });
+    }
+    return {
+      title: grade.title,
+      score: manualSubmission?.finalScore ?? grade.autoScore,
+      details
+    };
+  });
+}
 
 function buildStudentRow(state, student, index) {
   const group = state.groups.find((item) => item.id === student.groupId);
@@ -244,7 +276,8 @@ function buildStudentRow(state, student, index) {
     progress: index === 0 ? 67 : index === 1 ? 42 : 15,
     bestScore: index === 0 ? 100 : index === 1 ? 78 : 55,
     pending: state.manualSubmissions.filter((item) => item.studentId === student.id && item.status === "PENDING").length,
-    ...insight
+    ...insight,
+    grades: buildGrades(state, student.id, insight)
   };
 }
 

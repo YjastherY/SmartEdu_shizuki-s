@@ -457,8 +457,8 @@ function StudentDetails({ student }) {
         </div>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
-        <Insight title="Лучше всего получается" items={student.strengths} tone="good" />
-        <Insight title="Проседает" items={student.weaknesses} tone="warn" />
+        <Insight title="Лучше всего получается" courses={student.strengthsByCourse} tone="good" />
+        <Insight title="Нужно подтянуть" courses={student.focusByCourse} tone="warn" />
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <div>
@@ -471,9 +471,19 @@ function StudentDetails({ student }) {
           <h3 className="mb-3 font-bold">Оценки</h3>
           <div className="space-y-2">
             {student.grades.map((grade) => (
-              <div key={grade.title} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-800">
-                <span>{grade.title}</span>
-                <span className="font-semibold">{grade.score === null ? grade.type : `${grade.score}%`}</span>
+              <div key={grade.title} className="rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-800">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-semibold">{grade.title}</span>
+                  <span className="font-semibold">{grade.score}%</span>
+                </div>
+                <div className="mt-2 space-y-1 text-slate-500 dark:text-slate-300">
+                  {grade.details.map((detail) => (
+                    <div key={detail.label} className="flex items-center justify-between gap-3">
+                      <span>{detail.label}</span>
+                      <span>{detail.value}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
@@ -483,12 +493,19 @@ function StudentDetails({ student }) {
   );
 }
 
-function Insight({ title, items, tone }) {
+function Insight({ title, courses, tone }) {
   return (
     <div className={`rounded-lg p-4 ${tone === "good" ? "bg-emerald-50 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100" : "bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-100"}`}>
       <h3 className="mb-3 font-bold">{title}</h3>
-      <div className="flex flex-wrap gap-2">
-        {items.map((item) => <span key={item} className="rounded-full bg-white/70 px-3 py-1 text-sm dark:bg-white/10">{item}</span>)}
+      <div className="space-y-3">
+        {courses.map((course) => (
+          <div key={course.course}>
+            <p className="mb-2 text-sm font-semibold opacity-80">{course.course}</p>
+            <div className="flex flex-wrap gap-2">
+              {course.topics.map((topic) => <span key={topic} className="rounded-full bg-white/70 px-3 py-1 text-sm dark:bg-white/10">{topic}</span>)}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
