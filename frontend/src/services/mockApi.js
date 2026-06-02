@@ -175,6 +175,62 @@ const courses = [
   }
 ];
 
+const studentInsights = {
+  "user-1": {
+    completed: ["Что такое компоненты", "Тест по компонентам"],
+    strengths: ["JSX", "props", "структура компонентов"],
+    weaknesses: ["роутинг", "управление состоянием"],
+    grades: [
+      { title: "React Components Quiz", score: 100, type: "Авто" },
+      { title: "Развернутый ответ", score: null, type: "На проверке" }
+    ],
+    recentAnswers: [
+      { question: "Что возвращает React-компонент?", answer: "JSX-разметку", result: "Верно" },
+      { question: "Как передаются данные в компонент?", answer: "Через props", result: "Верно" }
+    ]
+  },
+  "user-4": {
+    completed: ["Что такое компоненты"],
+    strengths: ["переиспользование компонентов"],
+    weaknesses: ["точность терминов", "состояние"],
+    grades: [
+      { title: "React Components Quiz", score: 78, type: "Авто" },
+      { title: "Развернутый ответ", score: null, type: "На проверке" }
+    ],
+    recentAnswers: [
+      { question: "Что возвращает React-компонент?", answer: "UI-блок", result: "Частично" },
+      { question: "Как передаются данные в компонент?", answer: "Через props", result: "Верно" }
+    ]
+  },
+  "user-5": {
+    completed: ["Первый API endpoint"],
+    strengths: ["HTTP методы", "структура endpoint"],
+    weaknesses: ["JWT", "Prisma relations"],
+    grades: [
+      { title: "Express Basics", score: 55, type: "Авто" }
+    ],
+    recentAnswers: [
+      { question: "Что делает Express?", answer: "Создает HTTP API", result: "Верно" },
+      { question: "Где хранится токен?", answer: "В базе", result: "Неверно" }
+    ]
+  }
+};
+
+function buildStudentRow(state, student, index) {
+  const group = state.groups.find((item) => item.id === student.groupId);
+  const insight = studentInsights[student.id] || studentInsights["user-1"];
+  return {
+    id: student.id,
+    name: student.name,
+    email: student.email,
+    group: group?.title || "Без группы",
+    progress: index === 0 ? 67 : index === 1 ? 42 : 15,
+    bestScore: index === 0 ? 100 : index === 1 ? 78 : 55,
+    pending: state.manualSubmissions.filter((item) => item.studentId === student.id && item.status === "PENDING").length,
+    ...insight
+  };
+}
+
 function getState() {
   const saved = localStorage.getItem("smartedu_mock_state");
   const state = saved ? { ...initialState, ...JSON.parse(saved) } : initialState;
@@ -351,26 +407,22 @@ export async function mockApi(path, options = {}) {
     const teacherGroups = state.groups.filter((group) => group.teacherId === state.user.id || state.user.role === "ADMIN");
     const groupIds = teacherGroups.map((group) => group.id);
     const students = state.users.filter((user) => groupIds.includes(user.groupId));
-    const rows = students.map((student, index) => ({
-      id: student.id,
-      name: student.name,
-      group: state.groups.find((group) => group.id === student.groupId)?.title || "Без группы",
-      progress: index === 0 ? 67 : index === 1 ? 42 : 15,
-      bestScore: index === 0 ? 100 : index === 1 ? 78 : 55,
-      pending: state.manualSubmissions.filter((item) => item.studentId === student.id && item.status === "PENDING").length
-    }));
+    const rows = students.map((student, index) => buildStudentRow(state, student, index));
     return {
       courses,
       groups: teacherGroups.map((group) => ({
         ...group,
         teacher: state.users.find((user) => user.id === group.teacherId),
-        students: state.users.filter((user) => group.studentIds.includes(user.id))
+        students: state.users.filter((user) => group.studentIds.includes(user.id)).map((student, index) => buildStudentRow(state, student, index))
       })),
       students: rows,
       customTests: state.customTests,
       manualSubmissions: state.manualSubmissions.map((item) => ({
         ...item,
-        student: state.users.find((user) => user.id === item.studentId)
+        student: state.users.find((user) => user.id === item.studentId),
+        group: state.groups.find((group) => group.studentIds.includes(item.studentId)),
+        course: courses[0],
+        answers: studentInsights[item.studentId]?.recentAnswers || []
       }))
     };
   }
