@@ -670,6 +670,16 @@ export async function mockApi(path, options = {}) {
     state.manualSubmissions = state.manualSubmissions.map((item) =>
       item.id === id ? { ...item, status: "GRADED", score: manualScore, finalScore, feedback: body.feedback ?? item.feedback ?? "" } : item
     );
+    if (submission?.studentId) {
+      state.notifications.unshift({
+        id: `notification-grade-${id}-${Date.now()}`,
+        recipientId: submission.studentId,
+        submissionId: id,
+        title: "Оценка выставлена",
+        message: `Преподаватель оценил(а) работу «${submission.testTitle}»: ${manualScore} из ${submission.maxScore}.`,
+        read: false
+      });
+    }
     if (submission?.attemptId) {
       state.attempts = state.attempts.map((attempt) =>
         attempt.id === submission.attemptId
