@@ -3,6 +3,12 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 
+const demoAccounts = [
+  { label: "Студент", email: "student@smartedu.local" },
+  { label: "Препод", email: "teacher@smartedu.local" },
+  { label: "Админ", email: "admin@smartedu.local" }
+];
+
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -51,6 +57,21 @@ export default function Login() {
         <button className="btn-primary mt-6 w-full" disabled={loading}>
           {loading ? "Входим..." : "Войти"}
         </button>
+        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+          {demoAccounts.map((account) => (
+            <button
+              key={account.email}
+              className="btn-secondary px-3"
+              type="button"
+              onClick={() => {
+                setEmail(account.email);
+                setPassword("password123");
+              }}
+            >
+              {account.label}
+            </button>
+          ))}
+        </div>
         <p className="mt-4 text-center text-sm text-slate-500">
           Нет аккаунта? <Link className="font-semibold text-brand-600" to="/register">Зарегистрироваться</Link>
         </p>

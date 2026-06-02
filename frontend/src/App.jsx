@@ -9,6 +9,8 @@ import Login from "./pages/Login.jsx";
 import Profile from "./pages/Profile.jsx";
 import Progress from "./pages/Progress.jsx";
 import Register from "./pages/Register.jsx";
+import TeacherPanel from "./pages/TeacherPanel.jsx";
+import AdminPanel from "./pages/AdminPanel.jsx";
 
 export default function App() {
   return (
@@ -29,6 +31,8 @@ export default function App() {
         <Route path="/lessons/:lessonId" element={<Lesson />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/progress" element={<Progress />} />
+        <Route path="/teacher" element={<TeacherPanel />} />
+        <Route path="/admin" element={<AdminPanel />} />
       </Route>
     </Routes>
   );

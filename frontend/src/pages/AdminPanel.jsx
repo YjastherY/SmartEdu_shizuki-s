@@ -1,0 +1,109 @@
+import { ShieldCheck, UsersRound } from "lucide-react";
+import { useEffect, useState } from "react";
+import { api } from "../services/api.js";
+
+export default function AdminPanel() {
+  const [data, setData] = useState(null);
+
+  useEffect(() => {
+    api("/admin/overview").then(setData);
+  }, []);
+
+  if (!data) return <div className="panel text-sm text-slate-500">Загружаем админ-панель...</div>;
+
+  async function setRole(userId, role) {
+    const result = await api(`/admin/users/${userId}/role`, { method: "PATCH", body: JSON.stringify({ role }) });
+    setData((value) => ({ ...value, users: result.users }));
+  }
+
+  async function setTeacher(groupId, teacherId) {
+    await api(`/admin/groups/${groupId}`, { method: "PATCH", body: JSON.stringify({ teacherId }) });
+    setData(await api("/admin/overview"));
+  }
+
+  async function toggleStudent(group, studentId) {
+    const exists = group.studentIds.includes(studentId);
+    const studentIds = exists ? group.studentIds.filter((id) => id !== studentId) : [...group.studentIds, studentId];
+    await api(`/admin/groups/${group.id}`, { method: "PATCH", body: JSON.stringify({ studentIds }) });
+    setData(await api("/admin/overview"));
+  }
+
+  const teachers = data.users.filter((user) => user.role === "TEACHER" || user.role === "ADMIN");
+  const students = data.users.filter((user) => user.role === "STUDENT");
+
+  return (
+    <div className="page-enter space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">Админ-панель</h1>
+        <p className="text-sm text-slate-500">Роли аккаунтов, группы и назначение преподавателей.</p>
+      </div>
+
+      <section className="grid gap-4 md:grid-cols-2">
+        <div className="panel flex items-center gap-4">
+          <ShieldCheck className="text-brand-600" />
+          <div>
+            <p className="text-sm text-slate-500">Аккаунты</p>
+            <p className="text-2xl font-bold">{data.users.length}</p>
+          </div>
+        </div>
+        <div className="panel flex items-center gap-4">
+          <UsersRound className="text-brand-600" />
+          <div>
+            <p className="text-sm text-slate-500">Группы</p>
+            <p className="text-2xl font-bold">{data.groups.length}</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+        <div className="panel">
+          <h2 className="mb-4 text-xl font-bold">Пользователи</h2>
+          <div className="space-y-3">
+            {data.users.map((user) => (
+              <div key={user.id} className="rounded-lg border border-slate-200 p-4 dark:border-slate-700">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-semibold">{user.name}</p>
+                    <p className="text-sm text-slate-500">{user.email}</p>
+                  </div>
+                  <select className="input sm:w-40" value={user.role} onChange={(event) => setRole(user.id, event.target.value)}>
+                    <option value="STUDENT">Студент</option>
+                    <option value="TEACHER">Препод</option>
+                    <option value="ADMIN">Админ</option>
+                  </select>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="panel">
+          <h2 className="mb-4 text-xl font-bold">Группы</h2>
+          <div className="space-y-4">
+            {data.groups.map((group) => (
+              <div key={group.id} className="rounded-lg bg-slate-50 p-4 dark:bg-slate-800">
+                <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-bold">{group.title}</p>
+                    <p className="text-sm text-slate-500">{group.students.length} студентов</p>
+                  </div>
+                  <select className="input sm:w-56" value={group.teacherId} onChange={(event) => setTeacher(group.id, event.target.value)}>
+                    {teachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}
+                  </select>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {students.map((student) => (
+                    <label key={student.id} className="flex items-center gap-2 rounded-lg bg-white p-2 text-sm dark:bg-slate-900">
+                      <input type="checkbox" checked={group.studentIds.includes(student.id)} onChange={() => toggleStudent(group, student.id)} />
+                      {student.name}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}

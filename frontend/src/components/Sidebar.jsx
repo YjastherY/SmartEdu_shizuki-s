@@ -1,5 +1,6 @@
-import { BarChart3, BookOpen, GraduationCap, LayoutDashboard, User } from "lucide-react";
+import { BarChart3, BookOpen, GraduationCap, LayoutDashboard, ShieldCheck, User, UsersRound } from "lucide-react";
 import { NavLink } from "react-router-dom";
+import { useAuth } from "../context/AuthContext.jsx";
 
 const items = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -9,6 +10,13 @@ const items = [
 ];
 
 export default function Sidebar({ open, onClose }) {
+  const { user } = useAuth();
+  const visibleItems = [
+    ...items,
+    ...(user?.role === "TEACHER" || user?.role === "ADMIN" ? [{ to: "/teacher", label: "Преподаватель", icon: UsersRound }] : []),
+    ...(user?.role === "ADMIN" ? [{ to: "/admin", label: "Админ", icon: ShieldCheck }] : [])
+  ];
+
   return (
     <>
       <div
@@ -30,7 +38,7 @@ export default function Sidebar({ open, onClose }) {
           </div>
         </div>
         <nav className="space-y-2">
-          {items.map((item) => {
+          {visibleItems.map((item) => {
             const Icon = item.icon;
             return (
               <NavLink

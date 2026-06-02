@@ -10,6 +10,28 @@ const initialState = {
     avatarUrl: "",
     darkMode: false
   },
+  users: [
+    { id: "user-1", name: "Demo Student", email: "student@smartedu.local", role: "STUDENT", groupId: "group-1" },
+    { id: "user-2", name: "Anna Teacher", email: "teacher@smartedu.local", role: "TEACHER", groupId: null },
+    { id: "user-3", name: "Platform Admin", email: "admin@smartedu.local", role: "ADMIN", groupId: null },
+    { id: "user-4", name: "Ivan Petrov", email: "ivan@student.local", role: "STUDENT", groupId: "group-1" },
+    { id: "user-5", name: "Maria Smirnova", email: "maria@student.local", role: "STUDENT", groupId: "group-2" }
+  ],
+  groups: [
+    { id: "group-1", title: "FE-101", teacherId: "user-2", courseIds: ["course-1"], studentIds: ["user-1", "user-4"] },
+    { id: "group-2", title: "BE-201", teacherId: "user-2", courseIds: ["course-2"], studentIds: ["user-5"] }
+  ],
+  customTests: [],
+  manualSubmissions: [
+    {
+      id: "submission-1",
+      studentId: "user-4",
+      testTitle: "Развернутый ответ по компонентам",
+      answer: "Компонент нужен, чтобы разбить интерфейс на переиспользуемые части.",
+      status: "PENDING",
+      score: null
+    }
+  ],
   progress: [
     {
       id: "progress-1",
@@ -155,7 +177,7 @@ const courses = [
 
 function getState() {
   const saved = localStorage.getItem("smartedu_mock_state");
-  const state = saved ? JSON.parse(saved) : initialState;
+  const state = saved ? { ...initialState, ...JSON.parse(saved) } : initialState;
   return hydrateProgress(state);
 }
 
@@ -225,6 +247,19 @@ export async function mockApi(path, options = {}) {
     if (path === "/auth/register") {
       state.user = { ...state.user, name: body.name, email: body.email };
       saveState(state);
+    } else {
+      const account = state.users.find((item) => item.email === body.email);
+      if (account) {
+        state.user = {
+          id: account.id,
+          name: account.name,
+          email: account.email,
+          role: account.role,
+          avatarUrl: "",
+          darkMode: state.user.darkMode
+        };
+        saveState(state);
+      }
     }
     return { user: state.user, token: state.token };
   }
@@ -308,8 +343,86 @@ export async function mockApi(path, options = {}) {
   }
   if (path === "/users/settings") {
     state.user = { ...state.user, ...body };
+    state.users = state.users.map((item) => (item.id === state.user.id ? { ...item, name: state.user.name, email: state.user.email, role: state.user.role } : item));
     saveState(state);
     return { user: state.user };
+  }
+  if (path === "/teacher/overview") {
+    const teacherGroups = state.groups.filter((group) => group.teacherId === state.user.id || state.user.role === "ADMIN");
+    const groupIds = teacherGroups.map((group) => group.id);
+    const students = state.users.filter((user) => groupIds.includes(user.groupId));
+    const rows = students.map((student, index) => ({
+      id: student.id,
+      name: student.name,
+      group: state.groups.find((group) => group.id === student.groupId)?.title || "Без группы",
+      progress: index === 0 ? 67 : index === 1 ? 42 : 15,
+      bestScore: index === 0 ? 100 : index === 1 ? 78 : 55,
+      pending: state.manualSubmissions.filter((item) => item.studentId === student.id && item.status === "PENDING").length
+    }));
+    return {
+      courses,
+      groups: teacherGroups.map((group) => ({
+        ...group,
+        teacher: state.users.find((user) => user.id === group.teacherId),
+        students: state.users.filter((user) => group.studentIds.includes(user.id))
+      })),
+      students: rows,
+      customTests: state.customTests,
+      manualSubmissions: state.manualSubmissions.map((item) => ({
+        ...item,
+        student: state.users.find((user) => user.id === item.studentId)
+      }))
+    };
+  }
+  if (path === "/teacher/tests") {
+    const test = { id: `custom-test-${Date.now()}`, ...body, createdAt: new Date().toISOString() };
+    state.customTests = [test, ...state.customTests];
+    saveState(state);
+    return { test };
+  }
+  if (path.startsWith("/teacher/submissions/") && path.endsWith("/grade")) {
+    const id = path.split("/")[3];
+    state.manualSubmissions = state.manualSubmissions.map((item) =>
+      item.id === id ? { ...item, status: "GRADED", score: Number(body.score || 0), feedback: body.feedback || "" } : item
+    );
+    saveState(state);
+    return { submission: state.manualSubmissions.find((item) => item.id === id) };
+  }
+  if (path === "/admin/overview") {
+    return {
+      users: state.users,
+      groups: state.groups.map((group) => ({
+        ...group,
+        teacher: state.users.find((user) => user.id === group.teacherId),
+        students: state.users.filter((user) => group.studentIds.includes(user.id))
+      })),
+      courses
+    };
+  }
+  if (path.startsWith("/admin/users/") && path.endsWith("/role")) {
+    const id = path.split("/")[3];
+    state.users = state.users.map((user) => (user.id === id ? { ...user, role: body.role } : user));
+    if (state.user.id === id) state.user = { ...state.user, role: body.role };
+    saveState(state);
+    return { users: state.users, user: state.user };
+  }
+  if (path.startsWith("/admin/groups/")) {
+    const id = path.split("/")[3];
+    state.groups = state.groups.map((group) =>
+      group.id === id
+        ? {
+            ...group,
+            teacherId: body.teacherId ?? group.teacherId,
+            studentIds: body.studentIds ?? group.studentIds
+          }
+        : group
+    );
+    state.users = state.users.map((user) => {
+      const assignedGroup = state.groups.find((group) => group.studentIds.includes(user.id));
+      return user.role === "STUDENT" ? { ...user, groupId: assignedGroup?.id || null } : user;
+    });
+    saveState(state);
+    return { groups: state.groups };
   }
 
   throw new Error("Mock route not found");
