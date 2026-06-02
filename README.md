@@ -73,6 +73,52 @@ VITE_MOCK_API=true npm run dev
 
 This mode supports login, course pages, lessons, tests, progress, comments, profile settings, notifications, and dark mode in the browser.
 
+## Server Setup With Docker
+
+This setup is intended for the Ubuntu server. It keeps SmartEdu separate from other projects such as `kokoChat`.
+
+Used ports:
+
+- Frontend: `http://192.168.31.125:3000`
+- Backend API: `http://192.168.31.125:4000/api`
+- Backend health check: `http://192.168.31.125:4000/api/health`
+- PostgreSQL is available only inside the Docker network
+
+On the server:
+
+```bash
+cd ~/server-projects
+git clone git@github.com:YjastherY/SmartEdu_shizuki-s.git smartedu
+cd smartedu
+sudo docker compose -f docker-compose.server.yml up -d --build
+```
+
+Seed the demo data once after the containers start:
+
+```bash
+sudo docker compose -f docker-compose.server.yml exec backend npm run prisma:seed
+```
+
+Useful server commands:
+
+```bash
+sudo docker compose -f docker-compose.server.yml ps
+sudo docker compose -f docker-compose.server.yml logs -f backend
+sudo docker compose -f docker-compose.server.yml logs -f frontend
+sudo docker compose -f docker-compose.server.yml down
+sudo docker compose -f docker-compose.server.yml up -d --build
+```
+
+To update from GitHub:
+
+```bash
+cd ~/server-projects/smartedu
+git pull
+sudo docker compose -f docker-compose.server.yml up -d --build
+```
+
+The current backend covers the basic MVP API: auth, courses, lessons, tests, progress, comments, notifications, profile settings. Some newer teacher/admin UI features are still implemented in frontend mock mode and should be moved to backend routes before a full production release.
+
 ## Demo Account
 
 After running seed:

@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: smartedu-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: smartedu
+      POSTGRES_PASSWORD: smartedu
+      POSTGRES_DB: smartedu
+    volumes:
+      - smartedu_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smartedu -d smartedu"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+    container_name: smartedu-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://smartedu:smartedu@postgres:5432/smartedu?schema=public
+      JWT_SECRET: change-this-secret-before-public-demo
+      PORT: 4000
+      CLIENT_URL: http://192.168.31.125:3000
+    ports:
+      - "4000:4000"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: http://192.168.31.125:4000/api
+        VITE_MOCK_API: "false"
+    container_name: smartedu-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+
+volumes:
+  smartedu_postgres_data:
