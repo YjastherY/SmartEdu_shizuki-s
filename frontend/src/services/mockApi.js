@@ -551,11 +551,11 @@ export async function mockApi(path, options = {}) {
   if (path.startsWith("/teacher/submissions/") && path.endsWith("/grade")) {
     const id = path.split("/")[3];
     const submission = state.manualSubmissions.find((item) => item.id === id);
-    const manualScore = Math.min(Number(body.score || 0), Number(submission?.maxScore || 100));
+    const manualScore = Math.min(Number(body.score ?? submission?.score ?? 0), Number(submission?.maxScore || 100));
     const earnedPoints = Number(submission?.autoScore || 0) + manualScore;
     const finalScore = submission?.totalPoints ? Math.round((earnedPoints / submission.totalPoints) * 100) : manualScore;
     state.manualSubmissions = state.manualSubmissions.map((item) =>
-      item.id === id ? { ...item, status: "GRADED", score: manualScore, finalScore, feedback: body.feedback || "" } : item
+      item.id === id ? { ...item, status: "GRADED", score: manualScore, finalScore, feedback: body.feedback ?? item.feedback ?? "" } : item
     );
     if (submission?.attemptId) {
       state.attempts = state.attempts.map((attempt) =>

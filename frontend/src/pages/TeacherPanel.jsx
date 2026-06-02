@@ -205,38 +205,109 @@ function TestEditor({ courses, draft, saved, questionSummary, setDraft, saveTest
 }
 
 function ReviewTab({ submissions, pending, grade, setGrade, gradeSubmission }) {
+  const [mode, setMode] = useState("pending");
+  const [groupId, setGroupId] = useState("all");
+  const [query, setQuery] = useState("");
+  const graded = submissions.filter((item) => item.status === "GRADED");
+  const groups = Array.from(new Map(graded.map((item) => [item.group?.id || "none", item.group || { id: "none", title: "Без группы" }])).values());
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredGraded = graded.filter((item) => {
+    const matchesGroup = groupId === "all" || (item.group?.id || "none") === groupId;
+    const haystack = `${item.testTitle} ${item.student?.name || ""} ${item.student?.email || ""}`.toLowerCase();
+    return matchesGroup && (!normalizedQuery || haystack.includes(normalizedQuery));
+  });
+  const groupedGraded = groups
+    .filter((group) => groupId === "all" || group.id === groupId)
+    .map((group) => ({
+      group,
+      items: filteredGraded.filter((item) => (item.group?.id || "none") === group.id)
+    }))
+    .filter((section) => section.items.length > 0);
+
   return (
-    <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-      <div className="panel">
-        <h2 className="text-xl font-bold">Актуальные проверки</h2>
-        <div className="mt-4 space-y-3">
-          {pending.map((item) => (
-            <SubmissionCard key={item.id} item={item} grade={grade} setGrade={setGrade} gradeSubmission={gradeSubmission} compact />
-          ))}
-          {pending.length === 0 && <p className="text-sm text-slate-500">Сейчас всё проверено.</p>}
+    <section className="panel space-y-5">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <h2 className="text-xl font-bold">Проверка работ</h2>
+        <div className="flex gap-2 rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-800">
+          <button
+            className={`rounded-md px-3 py-2 text-sm font-semibold transition ${mode === "pending" ? "bg-brand-600 text-white" : "text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-900"}`}
+            onClick={() => setMode("pending")}
+          >
+            К проверке
+          </button>
+          <button
+            className={`rounded-md px-3 py-2 text-sm font-semibold transition ${mode === "graded" ? "bg-brand-600 text-white" : "text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-900"}`}
+            onClick={() => setMode("graded")}
+          >
+            Проверенные работы
+          </button>
         </div>
       </div>
 
-      <div className="panel">
-        <h2 className="text-xl font-bold">Все работы</h2>
-        <div className="mt-4 space-y-3">
-          {submissions.map((item) => (
+      {mode === "pending" && (
+        <div className="space-y-3">
+          {pending.map((item) => (
             <SubmissionCard key={item.id} item={item} grade={grade} setGrade={setGrade} gradeSubmission={gradeSubmission} />
           ))}
+          {pending.length === 0 && <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-800">Сейчас всё проверено.</p>}
         </div>
-      </div>
+      )}
+
+      {mode === "graded" && (
+        <div className="space-y-5">
+          <div className="grid gap-3 md:grid-cols-[1fr_220px]">
+            <input
+              className="input"
+              placeholder="Поиск по тесту, имени или фамилии"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            <select className="input" value={groupId} onChange={(event) => setGroupId(event.target.value)}>
+              <option value="all">Все группы</option>
+              {groups.map((group) => <option key={group.id} value={group.id}>{group.title}</option>)}
+            </select>
+          </div>
+
+          <div className="space-y-5">
+            {groupedGraded.map((section) => (
+              <div key={section.group.id} className="space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2 dark:border-slate-700">
+                  <h3 className="font-bold">{section.group.title}</h3>
+                  <span className="text-sm text-slate-500">{section.items.length} работ</span>
+                </div>
+                {section.items.map((item) => (
+                  <SubmissionCard key={item.id} item={item} grade={grade} setGrade={setGrade} gradeSubmission={gradeSubmission} />
+                ))}
+              </div>
+            ))}
+            {filteredGraded.length === 0 && <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-800">Ничего не найдено.</p>}
+          </div>
+        </div>
+      )}
     </section>
   );
 }
 
 function SubmissionCard({ item, grade, setGrade, gradeSubmission, compact = false }) {
+  const [editing, setEditing] = useState(item.status === "PENDING");
   const currentGrade = grade[item.id] || {};
-  const score = currentGrade.score || "";
+  const score = currentGrade.score ?? item.score ?? "";
+  const feedback = currentGrade.feedback ?? item.feedback ?? "";
   const maxScore = Number(item.maxScore || 100);
   const quickScores = [0.5, 0.75, 0.9, 1].map((value) => Math.round(maxScore * value));
 
   function updateGrade(patch) {
     setGrade({ ...grade, [item.id]: { ...currentGrade, ...patch } });
+  }
+
+  function beginEdit() {
+    setGrade({ ...grade, [item.id]: { score: item.score ?? 0, feedback: item.feedback || "" } });
+    setEditing(true);
+  }
+
+  async function saveGrade() {
+    await gradeSubmission(item.id);
+    setEditing(false);
   }
 
   return (
@@ -266,11 +337,16 @@ function SubmissionCard({ item, grade, setGrade, gradeSubmission, compact = fals
           ))}
         </div>
       )}
-      {item.status === "GRADED" ? (
+      {item.status === "GRADED" && !editing ? (
         <div className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800 dark:bg-emerald-950 dark:text-emerald-100">
-          <p className="font-semibold">Оценка: {item.score} из {maxScore}</p>
-          {item.finalScore != null && <p className="mt-1">Итог за тест: {item.finalScore}%</p>}
-          {item.feedback && <p className="mt-1">{item.feedback}</p>}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="font-semibold">Оценка: {item.score} из {maxScore}</p>
+              {item.finalScore != null && <p className="mt-1">Итог за тест: {item.finalScore}%</p>}
+              {item.feedback && <p className="mt-1">{item.feedback}</p>}
+            </div>
+            <button className="btn-secondary bg-white/70 px-3 py-1 dark:bg-white/10" onClick={beginEdit}>Изменить</button>
+          </div>
         </div>
       ) : (
         <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
@@ -291,9 +367,10 @@ function SubmissionCard({ item, grade, setGrade, gradeSubmission, compact = fals
               <span className="text-sm text-slate-500">из {maxScore}</span>
             </label>
           </div>
-          <textarea className="input mt-3 min-h-24" placeholder="Комментарий к оценке" value={currentGrade.feedback || ""} onChange={(event) => updateGrade({ feedback: event.target.value })} />
-          <div className="mt-3 flex justify-end">
-            <button className="btn-primary" onClick={() => gradeSubmission(item.id)}>Сохранить оценку</button>
+          <textarea className="input mt-3 min-h-24" placeholder="Комментарий к оценке" value={feedback} onChange={(event) => updateGrade({ feedback: event.target.value })} />
+          <div className="mt-3 flex justify-end gap-2">
+            {item.status === "GRADED" && <button className="btn-secondary" onClick={() => setEditing(false)}>Отмена</button>}
+            <button className="btn-primary" onClick={saveGrade}>Сохранить оценку</button>
           </div>
         </div>
       )}
