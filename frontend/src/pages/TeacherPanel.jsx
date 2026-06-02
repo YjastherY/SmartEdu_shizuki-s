@@ -17,12 +17,6 @@ const emptyQuestion = {
   maxScore: 10
 };
 
-const questionLabels = {
-  MULTIPLE_CHOICE: "варианты",
-  MATCHING: "сопоставление",
-  MANUAL: "развернутый ответ"
-};
-
 export default function TeacherPanel() {
   const [activeTab, setActiveTab] = useState("review");
   const [data, setData] = useState(null);
@@ -52,7 +46,8 @@ export default function TeacherPanel() {
   const selectedGroup = data?.groups.find((group) => group.id === selectedGroupId);
   const selectedStudent = selectedGroup?.students.find((student) => student.id === selectedStudentId);
   const pending = data?.manualSubmissions.filter((item) => item.status === "PENDING") || [];
-  const questionSummary = useMemo(() => draft.questions.map((item) => questionLabels[item.type]).join(" • "), [draft.questions]);
+  const totalPoints = useMemo(() => draft.questions.reduce((sum, item) => sum + Number(item.maxScore || 0), 0), [draft.questions]);
+  const questionSummary = useMemo(() => `${draft.questions.length} заданий • ${totalPoints} баллов`, [draft.questions.length, totalPoints]);
 
   if (!data) return <div className="panel text-sm text-slate-500">Загружаем кабинет преподавателя...</div>;
 
@@ -237,6 +232,8 @@ function ReviewTab({ submissions, pending, grade, setGrade, gradeSubmission }) {
 function SubmissionCard({ item, grade, setGrade, gradeSubmission, compact = false }) {
   const currentGrade = grade[item.id] || {};
   const score = currentGrade.score || "";
+  const maxScore = Number(item.maxScore || 100);
+  const quickScores = [0.5, 0.75, 0.9, 1].map((value) => Math.round(maxScore * value));
 
   function updateGrade(patch) {
     setGrade({ ...grade, [item.id]: { ...currentGrade, ...patch } });
@@ -271,7 +268,8 @@ function SubmissionCard({ item, grade, setGrade, gradeSubmission, compact = fals
       )}
       {item.status === "GRADED" ? (
         <div className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800 dark:bg-emerald-950 dark:text-emerald-100">
-          <p className="font-semibold">Оценка: {item.score}</p>
+          <p className="font-semibold">Оценка: {item.score} из {maxScore}</p>
+          {item.finalScore != null && <p className="mt-1">Итог за тест: {item.finalScore}%</p>}
           {item.feedback && <p className="mt-1">{item.feedback}</p>}
         </div>
       ) : (
@@ -279,16 +277,19 @@ function SubmissionCard({ item, grade, setGrade, gradeSubmission, compact = fals
           <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="font-semibold">Оценивание</p>
             <div className="flex flex-wrap gap-2">
-              {[60, 75, 90, 100].map((value) => (
+              {quickScores.map((value) => (
                 <button key={value} type="button" className="btn-secondary px-3 py-1" onClick={() => updateGrade({ score: value })}>
                   {value}
                 </button>
               ))}
             </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-[1fr_90px]">
-            <input className="w-full accent-brand-600" type="range" min="0" max="100" value={score || 0} onChange={(event) => updateGrade({ score: Number(event.target.value) })} />
-            <input className="input" type="number" min="0" max="100" placeholder="Балл" value={score} onChange={(event) => updateGrade({ score: event.target.value })} />
+          <div className="grid gap-3 sm:grid-cols-[1fr_130px]">
+            <input className="w-full accent-brand-600" type="range" min="0" max={maxScore} value={score || 0} onChange={(event) => updateGrade({ score: Number(event.target.value) })} />
+            <label className="flex items-center gap-2">
+              <input className="input" type="number" min="0" max={maxScore} placeholder="Балл" value={score} onChange={(event) => updateGrade({ score: event.target.value })} />
+              <span className="text-sm text-slate-500">из {maxScore}</span>
+            </label>
           </div>
           <textarea className="input mt-3 min-h-24" placeholder="Комментарий к оценке" value={currentGrade.feedback || ""} onChange={(event) => updateGrade({ feedback: event.target.value })} />
           <div className="mt-3 flex justify-end">
@@ -405,19 +406,38 @@ function Insight({ title, items, tone }) {
 }
 
 function QuestionEditor({ index, question, onChange, onDelete }) {
+  function changeType(type) {
+    const presets = {
+      MULTIPLE_CHOICE: { options: question.options?.length ? question.options : ["", ""], correctIndexes: question.correctIndexes?.length ? question.correctIndexes : [0] },
+      MATCHING: { pairs: question.pairs?.length ? question.pairs : [{ left: "", right: "" }] },
+      MANUAL: {}
+    };
+    onChange({ type, ...presets[type], maxScore: question.maxScore || 10 });
+  }
+
   return (
     <div className="rounded-lg border border-slate-200 p-4 dark:border-slate-700">
       <div className="mb-3 flex items-center justify-between gap-3">
         <p className="font-bold">Задание {index + 1}</p>
         <button type="button" className="btn-secondary px-3" onClick={onDelete} aria-label="Удалить задание"><Trash2 size={16} /></button>
       </div>
-      <div className="grid gap-3 md:grid-cols-[180px_1fr]">
-        <select className="input" value={question.type} onChange={(event) => onChange({ ...emptyQuestion, type: event.target.value })}>
+      <div className="grid gap-3 md:grid-cols-[180px_1fr_160px]">
+        <select className="input" value={question.type} onChange={(event) => changeType(event.target.value)}>
           <option value="MULTIPLE_CHOICE">Варианты</option>
           <option value="MATCHING">Сопоставление</option>
           <option value="MANUAL">Развернутый ответ</option>
         </select>
         <input className="input" placeholder="Текст задания" value={question.text} onChange={(event) => onChange({ text: event.target.value })} />
+        <label className="sr-only" htmlFor={`question-score-${index}`}>Баллы</label>
+        <input
+          id={`question-score-${index}`}
+          className="input"
+          type="number"
+          min="1"
+          placeholder="Баллы"
+          value={question.maxScore}
+          onChange={(event) => onChange({ maxScore: Number(event.target.value) })}
+        />
       </div>
 
       {question.type === "MULTIPLE_CHOICE" && (
@@ -454,13 +474,6 @@ function QuestionEditor({ index, question, onChange, onDelete }) {
           ))}
           <button type="button" className="btn-secondary" onClick={() => onChange({ pairs: [...question.pairs, { left: "", right: "" }] })}>Добавить пару</button>
         </div>
-      )}
-
-      {question.type === "MANUAL" && (
-        <label className="mt-3 block text-sm font-medium">
-          Максимальный балл
-          <input className="input mt-1" type="number" min="1" value={question.maxScore} onChange={(event) => onChange({ maxScore: Number(event.target.value) })} />
-        </label>
       )}
     </div>
   );

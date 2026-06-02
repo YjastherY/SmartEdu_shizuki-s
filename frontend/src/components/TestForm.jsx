@@ -1,4 +1,4 @@
-import { Clock, Medal, RotateCcw, Timer } from "lucide-react";
+import { Award, Clock, Medal, RotateCcw, Timer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../services/api.js";
 
@@ -17,11 +17,12 @@ export default function TestForm({ test, onSubmitted }) {
   const attempts = result?.attempts || test.attempts || [];
   const attemptLimit = test.attemptLimit || 0;
   const attemptsLeft = attemptLimit ? Math.max(attemptLimit - attempts.length, 0) : null;
-  const bestScore = result?.bestScore ?? test.bestScore ?? (attempts.length ? Math.max(...attempts.map((attempt) => attempt.score)) : null);
+  const bestScore = result ? result.bestScore : test.bestScore ?? getBestScore(attempts);
   const deadlineDate = test.deadline ? new Date(test.deadline) : null;
   const deadlinePassed = deadlineDate ? Date.now() > deadlineDate.getTime() : false;
   const canStart = !deadlinePassed && (attemptsLeft === null || attemptsLeft > 0);
-  const answeredAll = test.questions.every((question) => answers[question.id]);
+  const totalPoints = test.questions.reduce((sum, question) => sum + getQuestionPoints(question), 0);
+  const answeredAll = test.questions.every((question) => hasAnswer(question, answers[question.id]));
 
   useEffect(() => {
     if (!started || !test.timeLimitMinutes) return;
@@ -88,11 +89,14 @@ export default function TestForm({ test, onSubmitted }) {
           <Info icon={RotateCcw} label="Попытки" value={attemptLimit ? `${attempts.length}/${attemptLimit}` : "Без лимита"} />
           <Info icon={Timer} label="Время" value={test.timeLimitMinutes ? `${test.timeLimitMinutes} мин` : "Без лимита"} />
           <Info icon={Clock} label="Дедлайн" value={deadlineDate ? deadlineDate.toLocaleDateString("ru-RU") : "Без дедлайна"} />
+          <Info icon={Award} label="Баллы" value={`${totalPoints} баллов`} />
           <Info icon={Medal} label="Лучший балл" value={bestScore === null ? "Пока нет" : `${bestScore}%`} />
         </div>
         {result && (
-          <p className="rounded-lg bg-emerald-50 p-3 text-sm font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-100">
-            Последняя попытка: {result.score}%. Лучший результат: {result.bestScore}%.
+          <p className={`rounded-lg p-3 text-sm font-semibold ${result.pendingReview ? "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-100" : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-100"}`}>
+            {result.pendingReview
+              ? `Автопроверка: ${result.earnedPoints} из ${result.totalPoints}. Итог появится после проверки преподавателем.`
+              : `Последняя попытка: ${result.score}%. Лучший результат: ${result.bestScore}%.`}
           </p>
         )}
         {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-950 dark:text-red-200">{error}</p>}
@@ -113,7 +117,7 @@ export default function TestForm({ test, onSubmitted }) {
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
         <div>
           <h2 className="text-xl font-bold">{test.title}</h2>
-          <p className="text-sm text-slate-500">Выберите один ответ для каждого вопроса.</p>
+          <p className="text-sm text-slate-500">Заполните все задания. Баллы зависят от веса каждого вопроса.</p>
         </div>
         {test.timeLimitMinutes && (
           <div className="rounded-lg bg-brand-50 px-3 py-2 text-sm font-bold text-brand-700 dark:bg-brand-950 dark:text-brand-100">
@@ -123,23 +127,13 @@ export default function TestForm({ test, onSubmitted }) {
       </div>
       {test.questions.map((question, index) => (
         <fieldset key={question.id} className="rounded-lg border border-slate-200 p-4 dark:border-slate-700">
-          <legend className="px-1 text-sm font-semibold">
-            {index + 1}. {question.text}
+          <legend className="px-1">
+            <span className="text-sm font-semibold">{index + 1}. {question.text}</span>
+            <span className="ml-2 rounded-full bg-brand-50 px-2 py-1 text-xs font-bold text-brand-700 dark:bg-brand-950 dark:text-brand-100">
+              {getQuestionPoints(question)} баллов
+            </span>
           </legend>
-          <div className="mt-3 space-y-2">
-            {question.answers.map((answer) => (
-              <label key={answer.id} className="flex cursor-pointer items-center gap-3 rounded-lg p-2 hover:bg-slate-50 dark:hover:bg-slate-800">
-                <input
-                  type="radio"
-                  name={question.id}
-                  value={answer.id}
-                  checked={answers[question.id] === answer.id}
-                  onChange={() => setAnswers((value) => ({ ...value, [question.id]: answer.id }))}
-                />
-                <span className="text-sm">{answer.text}</span>
-              </label>
-            ))}
-          </div>
+          <QuestionAnswer question={question} value={answers[question.id]} setAnswers={setAnswers} />
         </fieldset>
       ))}
       {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-950 dark:text-red-200">{error}</p>}
@@ -148,6 +142,101 @@ export default function TestForm({ test, onSubmitted }) {
       </button>
     </form>
   );
+}
+
+function QuestionAnswer({ question, value, setAnswers }) {
+  const type = question.type || "MULTIPLE_CHOICE";
+
+  if (question.answers?.length) {
+    return (
+      <div className="mt-3 space-y-2">
+        {question.answers.map((answer) => (
+          <label key={answer.id} className="flex cursor-pointer items-center gap-3 rounded-lg p-2 hover:bg-slate-50 dark:hover:bg-slate-800">
+            <input
+              type="radio"
+              name={question.id}
+              value={answer.id}
+              checked={value === answer.id}
+              onChange={() => setAnswers((answers) => ({ ...answers, [question.id]: answer.id }))}
+            />
+            <span className="text-sm">{answer.text}</span>
+          </label>
+        ))}
+      </div>
+    );
+  }
+
+  if (type === "MULTIPLE_CHOICE") {
+    const selected = Array.isArray(value) ? value : [];
+    return (
+      <div className="mt-3 space-y-2">
+        {question.options.map((option, optionIndex) => (
+          <label key={optionIndex} className="flex cursor-pointer items-center gap-3 rounded-lg p-2 hover:bg-slate-50 dark:hover:bg-slate-800">
+            <input
+              type="checkbox"
+              checked={selected.includes(optionIndex)}
+              onChange={() => {
+                const next = selected.includes(optionIndex)
+                  ? selected.filter((item) => item !== optionIndex)
+                  : [...selected, optionIndex];
+                setAnswers((answers) => ({ ...answers, [question.id]: next }));
+              }}
+            />
+            <span className="text-sm">{option || `Вариант ${optionIndex + 1}`}</span>
+          </label>
+        ))}
+      </div>
+    );
+  }
+
+  if (type === "MATCHING") {
+    const selected = value || {};
+    const rightOptions = question.pairs.map((pair) => pair.right);
+    return (
+      <div className="mt-3 space-y-2">
+        {question.pairs.map((pair, pairIndex) => (
+          <label key={pairIndex} className="grid gap-2 rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-800 sm:grid-cols-[1fr_1fr] sm:items-center">
+            <span className="font-medium">{pair.left || `Пункт ${pairIndex + 1}`}</span>
+            <select
+              className="input"
+              value={selected[pairIndex] || ""}
+              onChange={(event) => setAnswers((answers) => ({ ...answers, [question.id]: { ...selected, [pairIndex]: event.target.value } }))}
+            >
+              <option value="">Выберите соответствие</option>
+              {rightOptions.map((option, optionIndex) => <option key={optionIndex} value={option}>{option || `Вариант ${optionIndex + 1}`}</option>)}
+            </select>
+          </label>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <textarea
+      className="input mt-3 min-h-28"
+      placeholder="Напишите развернутый ответ"
+      value={value || ""}
+      onChange={(event) => setAnswers((answers) => ({ ...answers, [question.id]: event.target.value }))}
+    />
+  );
+}
+
+function getQuestionPoints(question) {
+  return Number(question.maxScore || question.points || 1);
+}
+
+function getBestScore(attempts) {
+  const graded = attempts.filter((attempt) => attempt.status !== "PENDING_REVIEW");
+  return graded.length ? Math.max(...graded.map((attempt) => attempt.score)) : null;
+}
+
+function hasAnswer(question, value) {
+  const type = question.type || "MULTIPLE_CHOICE";
+  if (question.answers?.length) return Boolean(value);
+  if (type === "MATCHING") return value && Object.values(value).filter(Boolean).length === question.pairs.length;
+  if (type === "MANUAL") return typeof value === "string" && value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  return Boolean(value);
 }
 
 function Info({ icon: Icon, label, value }) {

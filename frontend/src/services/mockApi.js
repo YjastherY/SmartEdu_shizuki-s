@@ -29,7 +29,11 @@ const initialState = {
       testTitle: "Развернутый ответ по компонентам",
       answer: "Компонент нужен, чтобы разбить интерфейс на переиспользуемые части.",
       status: "PENDING",
-      score: null
+      score: null,
+      maxScore: 20,
+      autoScore: 18,
+      totalPoints: 40,
+      finalScore: null
     }
   ],
   progress: [
@@ -105,7 +109,9 @@ const courses = [
               questions: [
                 {
                   id: "question-1",
+                  type: "MULTIPLE_CHOICE",
                   text: "Что возвращает React-компонент?",
+                  maxScore: 10,
                   answers: [
                     { id: "answer-1", text: "JSX-разметку", isCorrect: true },
                     { id: "answer-2", text: "SQL-запрос", isCorrect: false },
@@ -114,12 +120,20 @@ const courses = [
                 },
                 {
                   id: "question-2",
+                  type: "MULTIPLE_CHOICE",
                   text: "Как передаются данные в компонент?",
+                  maxScore: 10,
                   answers: [
                     { id: "answer-4", text: "Через props", isCorrect: true },
                     { id: "answer-5", text: "Только через localStorage", isCorrect: false },
                     { id: "answer-6", text: "Через CSS selector", isCorrect: false }
                   ]
+                },
+                {
+                  id: "question-3",
+                  type: "MANUAL",
+                  text: "Объясните, когда компонент лучше вынести в отдельную часть интерфейса.",
+                  maxScore: 20
                 }
               ]
             }
@@ -241,10 +255,22 @@ function getState() {
       testTitle: "Связь props и состояния",
       answer: "Props передаются сверху вниз, а состояние хранится внутри компонента и меняется через setState или hooks.",
       status: "PENDING",
-      score: null
+      score: null,
+      maxScore: 15,
+      autoScore: 25,
+      totalPoints: 40,
+      finalScore: null
     });
     saveState(state);
   }
+  state.manualSubmissions = state.manualSubmissions.map((item) => ({
+    ...item,
+    maxScore: item.maxScore ?? (item.id === "submission-2" ? 15 : 20),
+    autoScore: item.autoScore ?? (item.id === "submission-2" ? 25 : 18),
+    totalPoints: item.totalPoints ?? 40,
+    finalScore: item.finalScore ?? null
+  }));
+  saveState(state);
   return hydrateProgress(state);
 }
 
@@ -287,6 +313,7 @@ function updateProgress(state, courseId) {
   const bestScores = Object.values(
     state.attempts.reduce((best, item) => {
       if (!item.testId) return best;
+      if (item.status === "PENDING_REVIEW") return best;
       best[item.testId] = Math.max(best[item.testId] || 0, item.score);
       return best;
     }, {})
@@ -304,6 +331,43 @@ function updateProgress(state, courseId) {
   };
   state.progress = [nextProgress, ...state.progress.filter((item) => item.courseId !== courseId)];
   return nextProgress;
+}
+
+function getQuestionPoints(question) {
+  return Number(question.maxScore || question.points || 1);
+}
+
+function isAutoCorrect(question, answer) {
+  if (question.answers?.length) {
+    return question.answers.some((item) => item.id === answer && item.isCorrect);
+  }
+  if (question.type === "MULTIPLE_CHOICE") {
+    const selected = Array.isArray(answer) ? answer : [];
+    const correct = question.correctIndexes || [];
+    return selected.length === correct.length && selected.every((item) => correct.includes(item));
+  }
+  if (question.type === "MATCHING") {
+    return question.pairs.every((pair, index) => answer?.[index] === pair.right);
+  }
+  return false;
+}
+
+function getAnswerText(question, answer) {
+  if (question.answers?.length) {
+    return question.answers.find((item) => item.id === answer)?.text || "Без ответа";
+  }
+  if (question.type === "MULTIPLE_CHOICE") {
+    return (Array.isArray(answer) ? answer : []).map((index) => question.options[index]).filter(Boolean).join(", ") || "Без ответа";
+  }
+  if (question.type === "MATCHING") {
+    return question.pairs.map((pair, index) => `${pair.left}: ${answer?.[index] || "без ответа"}`).join("; ");
+  }
+  return answer || "Без ответа";
+}
+
+function getBestScore(attempts) {
+  const graded = attempts.filter((attempt) => attempt.status !== "PENDING_REVIEW");
+  return graded.length ? Math.max(...graded.map((attempt) => attempt.score)) : null;
 }
 
 export async function mockApi(path, options = {}) {
@@ -360,7 +424,7 @@ export async function mockApi(path, options = {}) {
       lesson.test = {
         ...lesson.test,
         attempts,
-        bestScore: attempts.length ? Math.max(...attempts.map((attempt) => attempt.score)) : null
+        bestScore: getBestScore(attempts)
       };
     }
     return { lesson };
@@ -375,24 +439,65 @@ export async function mockApi(path, options = {}) {
     if (lesson.test.attemptLimit && attempts.length >= lesson.test.attemptLimit) {
       throw new Error("Попытки закончились");
     }
-    const correct = lesson.test.questions.filter((question) =>
-      question.answers.some((answer) => answer.id === body.answers[question.id] && answer.isCorrect)
-    ).length;
-    const score = Math.round((correct / lesson.test.questions.length) * 100);
+    const totalPoints = lesson.test.questions.reduce((sum, question) => sum + getQuestionPoints(question), 0);
+    const autoQuestions = lesson.test.questions.filter((question) => question.type !== "MANUAL");
+    const manualQuestions = lesson.test.questions.filter((question) => question.type === "MANUAL");
+    const autoScore = autoQuestions.reduce((sum, question) => sum + (isAutoCorrect(question, body.answers[question.id]) ? getQuestionPoints(question) : 0), 0);
+    const manualMaxScore = manualQuestions.reduce((sum, question) => sum + getQuestionPoints(question), 0);
+    const score = Math.round((autoScore / totalPoints) * 100);
+    const attemptId = `attempt-${Date.now()}`;
+    const pendingReview = manualQuestions.length > 0;
+    const otherAnswers = autoQuestions.map((question) => ({
+      question: question.text,
+      answer: getAnswerText(question, body.answers[question.id]),
+      result: isAutoCorrect(question, body.answers[question.id]) ? "Верно" : "Неверно"
+    }));
     state.attempts.unshift({
-      id: `attempt-${Date.now()}`,
+      id: attemptId,
       testId,
       score,
+      autoScore,
+      manualScore: null,
+      totalPoints,
+      earnedPoints: autoScore,
+      status: pendingReview ? "PENDING_REVIEW" : "GRADED",
       createdAt: new Date().toISOString(),
       test: lesson.test
     });
+    if (pendingReview) {
+      state.manualSubmissions.unshift({
+        id: `submission-${Date.now()}`,
+        studentId: state.user.id,
+        testId,
+        attemptId,
+        testTitle: lesson.test.title,
+        answer: manualQuestions.map((question) => `${question.text}\n${body.answers[question.id] || "Без ответа"}`).join("\n\n"),
+        answers: otherAnswers,
+        status: "PENDING",
+        score: null,
+        maxScore: manualMaxScore,
+        autoScore,
+        totalPoints,
+        finalScore: null
+      });
+    }
     if (!state.completedLessons.includes(lesson.id)) state.completedLessons.push(lesson.id);
     const course = courses.find((item) => item.modules.some((module) => module.lessons.some((candidate) => candidate.id === lesson.id)));
     const progress = updateProgress(state, course.id);
     const nextAttempts = state.attempts.filter((attempt) => attempt.testId === testId);
-    const bestScore = Math.max(...nextAttempts.map((attempt) => attempt.score));
+    const bestScore = getBestScore(nextAttempts);
     saveState(state);
-    return { score, bestScore, attempts: nextAttempts, correct, total: lesson.test.questions.length, progress };
+    return {
+      score,
+      bestScore,
+      attempts: nextAttempts,
+      correct: otherAnswers.filter((answer) => answer.result === "Верно").length,
+      total: lesson.test.questions.length,
+      earnedPoints: autoScore,
+      totalPoints,
+      pendingReview,
+      progress
+    };
   }
   if (path === "/progress/me") {
     return { progress: state.progress, certificates: state.certificates, attempts: state.attempts };
@@ -433,7 +538,7 @@ export async function mockApi(path, options = {}) {
         student: state.users.find((user) => user.id === item.studentId),
         group: state.groups.find((group) => group.studentIds.includes(item.studentId)),
         course: courses[0],
-        answers: studentInsights[item.studentId]?.recentAnswers || []
+        answers: item.answers || studentInsights[item.studentId]?.recentAnswers || []
       }))
     };
   }
@@ -445,9 +550,23 @@ export async function mockApi(path, options = {}) {
   }
   if (path.startsWith("/teacher/submissions/") && path.endsWith("/grade")) {
     const id = path.split("/")[3];
+    const submission = state.manualSubmissions.find((item) => item.id === id);
+    const manualScore = Math.min(Number(body.score || 0), Number(submission?.maxScore || 100));
+    const earnedPoints = Number(submission?.autoScore || 0) + manualScore;
+    const finalScore = submission?.totalPoints ? Math.round((earnedPoints / submission.totalPoints) * 100) : manualScore;
     state.manualSubmissions = state.manualSubmissions.map((item) =>
-      item.id === id ? { ...item, status: "GRADED", score: Number(body.score || 0), feedback: body.feedback || "" } : item
+      item.id === id ? { ...item, status: "GRADED", score: manualScore, finalScore, feedback: body.feedback || "" } : item
     );
+    if (submission?.attemptId) {
+      state.attempts = state.attempts.map((attempt) =>
+        attempt.id === submission.attemptId
+          ? { ...attempt, status: "GRADED", manualScore, earnedPoints, score: finalScore }
+          : attempt
+      );
+      const lesson = courses.flatMap((course) => course.modules).flatMap((module) => module.lessons).find((item) => item.test?.id === submission.testId);
+      const course = courses.find((item) => item.modules.some((module) => module.lessons.some((candidate) => candidate.id === lesson?.id)));
+      if (course) updateProgress(state, course.id);
+    }
     saveState(state);
     return { submission: state.manualSubmissions.find((item) => item.id === id) };
   }
