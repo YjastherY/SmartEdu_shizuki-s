@@ -17,6 +17,12 @@ const emptyQuestion = {
   maxScore: 10
 };
 
+const questionLabels = {
+  MULTIPLE_CHOICE: "варианты",
+  MATCHING: "сопоставление",
+  MANUAL: "развернутый ответ"
+};
+
 export default function TeacherPanel() {
   const [activeTab, setActiveTab] = useState("review");
   const [data, setData] = useState(null);
@@ -46,7 +52,7 @@ export default function TeacherPanel() {
   const selectedGroup = data?.groups.find((group) => group.id === selectedGroupId);
   const selectedStudent = selectedGroup?.students.find((student) => student.id === selectedStudentId);
   const pending = data?.manualSubmissions.filter((item) => item.status === "PENDING") || [];
-  const questionSummary = useMemo(() => draft.questions.map((item) => item.type).join(" • "), [draft.questions]);
+  const questionSummary = useMemo(() => draft.questions.map((item) => questionLabels[item.type]).join(" • "), [draft.questions]);
 
   if (!data) return <div className="panel text-sm text-slate-500">Загружаем кабинет преподавателя...</div>;
 
@@ -54,7 +60,7 @@ export default function TeacherPanel() {
     event.preventDefault();
     const result = await api("/teacher/tests", { method: "POST", body: JSON.stringify(draft) });
     setData((value) => ({ ...value, customTests: [result.test, ...value.customTests] }));
-    setSaved("Тест сохранен в mock-редакторе");
+    setSaved("Тест сохранен");
   }
 
   async function gradeSubmission(id) {
@@ -148,7 +154,7 @@ function TestEditor({ courses, draft, saved, questionSummary, setDraft, saveTest
       <div>
         <p className="text-sm font-semibold text-brand-600">Редактор тестов</p>
         <h2 className="text-xl font-bold">Новый тест</h2>
-        <p className="text-sm text-slate-500">{questionSummary || "Добавьте задания"}</p>
+        {questionSummary && <p className="text-sm text-slate-500">{questionSummary}</p>}
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">
@@ -208,8 +214,7 @@ function ReviewTab({ submissions, pending, grade, setGrade, gradeSubmission }) {
     <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
       <div className="panel">
         <h2 className="text-xl font-bold">Актуальные проверки</h2>
-        <p className="mb-4 text-sm text-slate-500">Сначала работы, где требуется ручная оценка.</p>
-        <div className="space-y-3">
+        <div className="mt-4 space-y-3">
           {pending.map((item) => (
             <SubmissionCard key={item.id} item={item} grade={grade} setGrade={setGrade} gradeSubmission={gradeSubmission} compact />
           ))}
@@ -219,8 +224,7 @@ function ReviewTab({ submissions, pending, grade, setGrade, gradeSubmission }) {
 
       <div className="panel">
         <h2 className="text-xl font-bold">Все работы</h2>
-        <p className="mb-4 text-sm text-slate-500">Видно группу, ученика, тест и ответы по другим заданиям.</p>
-        <div className="space-y-3">
+        <div className="mt-4 space-y-3">
           {submissions.map((item) => (
             <SubmissionCard key={item.id} item={item} grade={grade} setGrade={setGrade} gradeSubmission={gradeSubmission} />
           ))}
@@ -231,6 +235,13 @@ function ReviewTab({ submissions, pending, grade, setGrade, gradeSubmission }) {
 }
 
 function SubmissionCard({ item, grade, setGrade, gradeSubmission, compact = false }) {
+  const currentGrade = grade[item.id] || {};
+  const score = currentGrade.score || "";
+
+  function updateGrade(patch) {
+    setGrade({ ...grade, [item.id]: { ...currentGrade, ...patch } });
+  }
+
   return (
     <div className="rounded-lg bg-slate-50 p-4 dark:bg-slate-800">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -259,12 +270,30 @@ function SubmissionCard({ item, grade, setGrade, gradeSubmission, compact = fals
         </div>
       )}
       {item.status === "GRADED" ? (
-        <p className="mt-3 rounded-lg bg-emerald-50 p-2 text-sm font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-100">Оценка: {item.score}</p>
+        <div className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800 dark:bg-emerald-950 dark:text-emerald-100">
+          <p className="font-semibold">Оценка: {item.score}</p>
+          {item.feedback && <p className="mt-1">{item.feedback}</p>}
+        </div>
       ) : (
-        <div className="mt-3 grid gap-2 sm:grid-cols-[100px_1fr_auto]">
-          <input className="input" type="number" min="0" max="100" placeholder="Балл" value={grade[item.id]?.score || ""} onChange={(event) => setGrade({ ...grade, [item.id]: { ...grade[item.id], score: event.target.value } })} />
-          <input className="input" placeholder="Комментарий" value={grade[item.id]?.feedback || ""} onChange={(event) => setGrade({ ...grade, [item.id]: { ...grade[item.id], feedback: event.target.value } })} />
-          <button className="btn-primary" onClick={() => gradeSubmission(item.id)}>Оценить</button>
+        <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+          <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="font-semibold">Оценивание</p>
+            <div className="flex flex-wrap gap-2">
+              {[60, 75, 90, 100].map((value) => (
+                <button key={value} type="button" className="btn-secondary px-3 py-1" onClick={() => updateGrade({ score: value })}>
+                  {value}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-[1fr_90px]">
+            <input className="w-full accent-brand-600" type="range" min="0" max="100" value={score || 0} onChange={(event) => updateGrade({ score: Number(event.target.value) })} />
+            <input className="input" type="number" min="0" max="100" placeholder="Балл" value={score} onChange={(event) => updateGrade({ score: event.target.value })} />
+          </div>
+          <textarea className="input mt-3 min-h-24" placeholder="Комментарий к оценке" value={currentGrade.feedback || ""} onChange={(event) => updateGrade({ feedback: event.target.value })} />
+          <div className="mt-3 flex justify-end">
+            <button className="btn-primary" onClick={() => gradeSubmission(item.id)}>Сохранить оценку</button>
+          </div>
         </div>
       )}
     </div>
@@ -308,7 +337,7 @@ function ProgressTab({ groups, selectedGroupId, selectedStudentId, selectedGroup
         {selectedStudent ? (
           <StudentDetails student={selectedStudent} />
         ) : (
-          <p className="text-sm text-slate-500">Выберите ученика.</p>
+          <div className="min-h-40" />
         )}
       </div>
     </section>

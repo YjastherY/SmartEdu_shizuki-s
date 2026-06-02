@@ -234,6 +234,17 @@ function buildStudentRow(state, student, index) {
 function getState() {
   const saved = localStorage.getItem("smartedu_mock_state");
   const state = saved ? { ...initialState, ...JSON.parse(saved) } : initialState;
+  if (!state.manualSubmissions.some((item) => item.id === "submission-2")) {
+    state.manualSubmissions.push({
+      id: "submission-2",
+      studentId: "user-1",
+      testTitle: "Связь props и состояния",
+      answer: "Props передаются сверху вниз, а состояние хранится внутри компонента и меняется через setState или hooks.",
+      status: "PENDING",
+      score: null
+    });
+    saveState(state);
+  }
   return hydrateProgress(state);
 }
 
