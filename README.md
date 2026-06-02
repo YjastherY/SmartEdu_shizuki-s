@@ -24,6 +24,7 @@ SmartEdu is an MVP educational platform for online courses, video lessons, tests
 - Lesson comments
 - Notifications for students and teachers
 - Student profile and dark mode
+- Avatar upload with static file serving
 - Teacher dashboard for test creation, grading, groups, and student progress
 - Admin dashboard for roles, groups, and teacher assignment
 - Docker-based local/server setup
@@ -166,6 +167,7 @@ password123
 - `POST /api/comments`
 - `GET /api/notifications`
 - `PATCH /api/users/settings`
+- `POST /api/users/avatar`
 - `GET /api/teacher/overview`
 - `POST /api/teacher/tests`
 - `PATCH /api/teacher/submissions/:id/grade`

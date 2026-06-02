@@ -1,10 +1,14 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
+import { assetUrl } from "../services/api.js";
 
 export default function Profile() {
-  const { user, updateSettings } = useAuth();
+  const { user, updateSettings, uploadAvatar } = useAuth();
   const [form, setForm] = useState({ name: user.name, avatarUrl: user.avatarUrl || "" });
   const [message, setMessage] = useState("");
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -12,12 +16,38 @@ export default function Profile() {
     setMessage("Профиль обновлен");
   }
 
+  async function handleAvatarChange(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+    setMessage("");
+  }
+
+  async function handleAvatarUpload() {
+    if (!avatarFile) return;
+
+    setUploading(true);
+    try {
+      const updatedUser = await uploadAvatar(avatarFile);
+      setForm((value) => ({ ...value, avatarUrl: updatedUser.avatarUrl || "" }));
+      setAvatarFile(null);
+      setAvatarPreview("");
+      setMessage("Аватар обновлен");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  const avatarSrc = avatarPreview || assetUrl(user.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(user.name)}`;
+
   return (
     <div className="page-enter grid gap-6 lg:grid-cols-[320px_1fr]">
       <aside className="panel text-center hover:shadow-md">
         <img
           className="mx-auto h-28 w-28 rounded-full object-cover ring-4 ring-brand-50 transition hover:scale-105 dark:ring-brand-950"
-          src={user.avatarUrl || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(user.name)}`}
+          src={avatarSrc}
           alt={user.name}
         />
         <h1 className="mt-4 text-2xl font-bold">{user.name}</h1>
@@ -35,8 +65,17 @@ export default function Profile() {
           Имя
           <input className="input mt-1" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
         </label>
+        <div className="grid gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700 sm:grid-cols-[1fr_auto] sm:items-end">
+          <label className="block text-sm font-medium">
+            Файл аватара
+            <input className="input mt-1" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={handleAvatarChange} />
+          </label>
+          <button type="button" className="btn-secondary" disabled={!avatarFile || uploading} onClick={handleAvatarUpload}>
+            {uploading ? "Загружаем..." : "Загрузить"}
+          </button>
+        </div>
         <label className="block text-sm font-medium">
-          Avatar URL
+          Ссылка на аватар
           <input className="input mt-1" value={form.avatarUrl} onChange={(event) => setForm({ ...form, avatarUrl: event.target.value })} />
         </label>
         <button className="btn-primary">Сохранить</button>

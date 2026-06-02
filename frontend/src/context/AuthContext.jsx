@@ -55,8 +55,19 @@ export function AuthProvider({ children }) {
     return data.user;
   }
 
+  async function uploadAvatar(file) {
+    const formData = new FormData();
+    formData.append("avatar", file);
+    const data = await api("/users/avatar", {
+      method: "POST",
+      body: formData
+    });
+    setUser(data.user);
+    return data.user;
+  }
+
   const value = useMemo(
-    () => ({ user, loading, login, register, logout, updateSettings }),
+    () => ({ user, loading, login, register, logout, updateSettings, uploadAvatar }),
     [user, loading]
   );
 

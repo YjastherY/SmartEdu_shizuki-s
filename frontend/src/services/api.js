@@ -2,6 +2,7 @@ import { mockApi } from "./mockApi.js";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
 const MOCK_API = import.meta.env.VITE_MOCK_API === "true";
+const API_ORIGIN = API_URL.replace(/\/api\/?$/, "");
 
 export function getToken() {
   return localStorage.getItem("smartedu_token");
@@ -21,10 +22,11 @@ export async function api(path, options = {}) {
   }
 
   const token = getToken();
+  const isFormData = options.body instanceof FormData;
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers
     }
@@ -41,4 +43,10 @@ export async function api(path, options = {}) {
   }
 
   return data;
+}
+
+export function assetUrl(url) {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) return url;
+  return `${API_ORIGIN}${url}`;
 }

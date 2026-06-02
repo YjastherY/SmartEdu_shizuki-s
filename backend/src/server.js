@@ -2,6 +2,8 @@ import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
 import morgan from "morgan";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { ZodError } from "zod";
 import adminRoutes from "./routes/admin.js";
 import authRoutes from "./routes/auth.js";
@@ -19,6 +21,7 @@ dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 4000;
+const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 app.use(
   cors({
@@ -28,6 +31,7 @@ app.use(
 );
 app.use(express.json());
 app.use(morgan("dev"));
+app.use("/uploads", express.static(path.join(rootDir, "uploads")));
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", service: "smartedu-api" });
@@ -54,6 +58,12 @@ app.use((error, req, res, next) => {
     return res.status(400).json({
       message: "Validation error",
       issues: error.errors
+    });
+  }
+
+  if (error.message === "Only image files are allowed" || error.code === "LIMIT_FILE_SIZE") {
+    return res.status(400).json({
+      message: error.code === "LIMIT_FILE_SIZE" ? "File is too large" : error.message
     });
   }
 

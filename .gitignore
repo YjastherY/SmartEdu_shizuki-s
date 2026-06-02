@@ -5,3 +5,4 @@ dist/
 .DS_Store
 coverage/
 backend/prisma/dev.db
+backend/uploads/

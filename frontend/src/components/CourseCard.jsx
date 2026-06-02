@@ -1,17 +1,32 @@
 import { ArrowRight, Clock } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
+import { assetUrl } from "../services/api.js";
 
 export default function CourseCard({ course }) {
   const lessonCount = course.modules?.reduce((sum, module) => sum + module.lessons.length, 0) || 0;
+  const [imageFailed, setImageFailed] = useState(false);
+  const imageUrl = assetUrl(course.imageUrl);
 
   return (
     <article className="polished-card group">
-      <div className="overflow-hidden">
-        <img
-          className="h-40 w-full object-cover transition duration-500 group-hover:scale-105"
-          src={course.imageUrl || "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1200&q=80"}
-          alt={course.title}
-        />
+      <div className="h-40 overflow-hidden">
+        {imageUrl && !imageFailed ? (
+          <img
+            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+            src={imageUrl}
+            alt={course.title}
+            onError={() => setImageFailed(true)}
+          />
+        ) : (
+          <div className="flex h-full w-full flex-col justify-between bg-gradient-to-br from-brand-600 via-sky-500 to-cyan-400 p-5 text-white transition duration-500 group-hover:scale-105">
+            <span className="w-fit rounded-full bg-white/20 px-3 py-1 text-xs font-bold backdrop-blur">{course.category}</span>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-white/75">SmartEdu course</p>
+              <p className="mt-1 text-2xl font-black leading-tight">{course.title}</p>
+            </div>
+          </div>
+        )}
       </div>
       <div className="p-5">
         <div className="mb-3 flex flex-wrap gap-2 text-xs">

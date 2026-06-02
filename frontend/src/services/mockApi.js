@@ -479,7 +479,7 @@ function syncTeacherNotifications(state) {
 
 export async function mockApi(path, options = {}) {
   const state = getState();
-  const body = options.body ? JSON.parse(options.body) : {};
+  const body = options.body instanceof FormData ? Object.fromEntries(options.body.entries()) : options.body ? JSON.parse(options.body) : {};
 
   if (path === "/auth/login" || path === "/auth/register") {
     if (path === "/auth/register") {
@@ -631,6 +631,15 @@ export async function mockApi(path, options = {}) {
     state.users = state.users.map((item) => (item.id === state.user.id ? { ...item, name: state.user.name, email: state.user.email, role: state.user.role } : item));
     saveState(state);
     return { user: state.user };
+  }
+  if (path === "/users/avatar") {
+    const file = body.avatar;
+    state.user = {
+      ...state.user,
+      avatarUrl: file instanceof File ? URL.createObjectURL(file) : state.user.avatarUrl
+    };
+    saveState(state);
+    return { user: state.user, avatarUrl: state.user.avatarUrl };
   }
   if (path === "/teacher/overview") {
     const teacherGroups = state.groups.filter((group) => group.teacherId === state.user.id || state.user.role === "ADMIN");

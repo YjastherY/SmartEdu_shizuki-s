@@ -1,12 +1,13 @@
 import { CheckCircle2, PlayCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api } from "../services/api.js";
+import { api, assetUrl } from "../services/api.js";
 
 export default function CourseDetail() {
   const { courseId } = useParams();
   const [course, setCourse] = useState(null);
   const [error, setError] = useState("");
+  const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
     api(`/courses/${courseId}`).then((data) => setCourse(data.course)).catch((err) => setError(err.message));
@@ -23,7 +24,24 @@ export default function CourseDetail() {
   return (
     <div className="page-enter space-y-6">
       <section className="polished-card group">
-        <img className="h-64 w-full object-cover transition duration-700 group-hover:scale-105" src={course.imageUrl} alt={course.title} />
+        <div className="h-64 overflow-hidden">
+          {course.imageUrl && !imageFailed ? (
+            <img
+              className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
+              src={assetUrl(course.imageUrl)}
+              alt={course.title}
+              onError={() => setImageFailed(true)}
+            />
+          ) : (
+            <div className="flex h-full w-full flex-col justify-between bg-gradient-to-br from-brand-600 via-sky-500 to-cyan-400 p-6 text-white transition duration-700 group-hover:scale-105">
+              <span className="w-fit rounded-full bg-white/20 px-3 py-1 text-xs font-bold backdrop-blur">{course.category}</span>
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-wide text-white/75">SmartEdu course</p>
+                <p className="mt-2 text-4xl font-black leading-tight">{course.title}</p>
+              </div>
+            </div>
+          )}
+        </div>
         <div className="p-6">
           <div className="mb-3 flex flex-wrap gap-2 text-xs">
             <span className="rounded-full bg-brand-50 px-2 py-1 font-semibold text-brand-700 dark:bg-brand-950 dark:text-brand-100">{course.category}</span>

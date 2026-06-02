@@ -30,6 +30,8 @@ services:
       CLIENT_URL: ${CLIENT_URL:-http://localhost:3000}
     ports:
       - "4000:4000"
+    volumes:
+      - smartedu_uploads:/app/uploads
 
   frontend:
     build:
@@ -46,3 +48,4 @@ services:
 
 volumes:
   smartedu_postgres_data:
+  smartedu_uploads:
