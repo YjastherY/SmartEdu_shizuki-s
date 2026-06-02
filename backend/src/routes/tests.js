@@ -7,7 +7,7 @@ import { asyncHandler } from "../utils.js";
 const router = Router();
 
 const submitSchema = z.object({
-  answers: z.record(z.string(), z.string())
+  answers: z.record(z.string(), z.any())
 });
 
 async function updateCourseProgress(userId, courseId) {
@@ -17,7 +17,7 @@ async function updateCourseProgress(userId, courseId) {
   });
   const attempts = await prisma.testAttempt.groupBy({
     by: ["testId"],
-    where: { userId, test: { lesson: { module: { courseId } } } },
+    where: { userId, status: "GRADED", test: { lesson: { module: { courseId } } } },
     _max: { score: true }
   });
   const averageScore = attempts.length
@@ -29,6 +29,73 @@ async function updateCourseProgress(userId, courseId) {
     where: { userId_courseId: { userId, courseId } },
     update: { completedLessons, totalLessons, averageScore, percent },
     create: { userId, courseId, completedLessons, totalLessons, averageScore, percent }
+  });
+}
+
+function getQuestionPoints(question) {
+  return Number(question.maxScore || 1);
+}
+
+function normalizeArray(value) {
+  return Array.isArray(value) ? value.map(String) : value ? [String(value)] : [];
+}
+
+function isAutoCorrect(question, answer) {
+  const correctAnswerIds = question.answers.filter((item) => item.isCorrect).map((item) => item.id);
+
+  if (question.type === "MATCHING") {
+    const selected = answer && typeof answer === "object" ? answer : {};
+    const pairs = question.answers.map((item) => item.text.split("→").map((part) => part.trim()));
+    return pairs.every(([, right], index) => selected[index] === right);
+  }
+
+  if (question.type === "MULTIPLE_CHOICE") {
+    const selected = normalizeArray(answer);
+    return selected.length === correctAnswerIds.length && selected.every((item) => correctAnswerIds.includes(item));
+  }
+
+  if (question.type === "SINGLE_CHOICE") {
+    return correctAnswerIds.includes(String(answer || ""));
+  }
+
+  return false;
+}
+
+async function getEffectiveDeadline(userId, test) {
+  const extension = await prisma.deadlineExtension.findUnique({
+    where: { userId_testId: { userId, testId: test.id } }
+  });
+
+  return extension?.deadline || test.deadline;
+}
+
+async function notifyTeachersForSubmission(test, user) {
+  const teacherIds = new Set();
+  const groups = await prisma.group.findMany({
+    where: {
+      students: { some: { id: user.id } },
+      courses: { some: { courseId: test.lesson.module.courseId } },
+      teacherId: { not: null }
+    },
+    select: { teacherId: true }
+  });
+
+  groups.forEach((group) => {
+    if (group.teacherId) teacherIds.add(group.teacherId);
+  });
+
+  const admins = await prisma.user.findMany({
+    where: { role: "ADMIN" },
+    select: { id: true }
+  });
+  admins.forEach((admin) => teacherIds.add(admin.id));
+
+  await prisma.notification.createMany({
+    data: Array.from(teacherIds).map((teacherId) => ({
+      userId: teacherId,
+      title: "Работа на проверку",
+      message: `${user.name} отправил(а) развернутый ответ по тесту «${test.title}».`
+    }))
   });
 }
 
@@ -49,7 +116,9 @@ router.post(
       return res.status(404).json({ message: "Test not found" });
     }
 
-    if (test.deadline && new Date() > test.deadline) {
+    const effectiveDeadline = await getEffectiveDeadline(req.user.id, test);
+
+    if (effectiveDeadline && new Date() > effectiveDeadline) {
       return res.status(403).json({ message: "Test deadline has passed" });
     }
 
@@ -61,15 +130,41 @@ router.post(
       return res.status(403).json({ message: "No attempts left" });
     }
 
-    const correct = test.questions.filter((question) => {
-      const selectedAnswerId = data.answers[question.id];
-      return question.answers.some((answer) => answer.id === selectedAnswerId && answer.isCorrect);
-    }).length;
-    const score = test.questions.length ? Math.round((correct / test.questions.length) * 100) : 0;
+    const autoQuestions = test.questions.filter((question) => question.type !== "MANUAL");
+    const manualQuestions = test.questions.filter((question) => question.type === "MANUAL");
+    const totalPoints = test.questions.reduce((sum, question) => sum + getQuestionPoints(question), 0);
+    const autoScore = autoQuestions.reduce(
+      (sum, question) => sum + (isAutoCorrect(question, data.answers[question.id]) ? getQuestionPoints(question) : 0),
+      0
+    );
+    const pendingReview = manualQuestions.length > 0;
+    const score = totalPoints ? Math.round((autoScore / totalPoints) * 100) : 0;
 
-    await prisma.testAttempt.create({
-      data: { userId: req.user.id, testId: test.id, score }
+    const attempt = await prisma.testAttempt.create({
+      data: {
+        userId: req.user.id,
+        testId: test.id,
+        score,
+        autoScore,
+        earnedPoints: autoScore,
+        totalPoints,
+        status: pendingReview ? "PENDING_REVIEW" : "GRADED",
+        manualSubmissions: {
+          create: manualQuestions.map((question) => ({
+            userId: req.user.id,
+            questionId: question.id,
+            answer: String(data.answers[question.id] || ""),
+            maxScore: getQuestionPoints(question)
+          }))
+        }
+      },
+      include: { manualSubmissions: true }
     });
+
+    if (pendingReview) {
+      await notifyTeachersForSubmission(test, req.user);
+    }
+
     await prisma.lessonCompletion.upsert({
       where: { userId_lessonId: { userId: req.user.id, lessonId: test.lessonId } },
       update: {},
@@ -92,11 +187,23 @@ router.post(
     const attempts = await prisma.testAttempt.findMany({
       where: { userId: req.user.id, testId: test.id },
       orderBy: { createdAt: "desc" },
-      select: { id: true, score: true, createdAt: true }
+      select: { id: true, score: true, status: true, autoScore: true, manualScore: true, earnedPoints: true, totalPoints: true, createdAt: true }
     });
-    const bestScore = Math.max(...attempts.map((attempt) => attempt.score));
+    const gradedAttempts = attempts.filter((item) => item.status === "GRADED");
+    const bestScore = gradedAttempts.length ? Math.max(...gradedAttempts.map((item) => item.score)) : null;
 
-    res.json({ score, bestScore, attempts, correct, total: test.questions.length, progress });
+    res.json({
+      score,
+      bestScore,
+      attempts,
+      correct: autoQuestions.filter((question) => isAutoCorrect(question, data.answers[question.id])).length,
+      total: test.questions.length,
+      earnedPoints: autoScore,
+      totalPoints,
+      pendingReview,
+      attempt,
+      progress
+    });
   })
 );
 

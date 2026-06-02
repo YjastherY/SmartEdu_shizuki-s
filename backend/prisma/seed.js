@@ -2,22 +2,25 @@ import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
-
 const videoUrl = "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4";
 
 async function main() {
   await prisma.notification.deleteMany();
   await prisma.comment.deleteMany();
+  await prisma.deadlineExtension.deleteMany();
+  await prisma.manualSubmission.deleteMany();
   await prisma.testAttempt.deleteMany();
   await prisma.lessonCompletion.deleteMany();
   await prisma.progress.deleteMany();
   await prisma.certificate.deleteMany();
+  await prisma.groupCourse.deleteMany();
   await prisma.answer.deleteMany();
   await prisma.question.deleteMany();
   await prisma.test.deleteMany();
   await prisma.lesson.deleteMany();
   await prisma.module.deleteMany();
   await prisma.course.deleteMany();
+  await prisma.group.deleteMany();
   await prisma.user.deleteMany();
 
   const passwordHash = await bcrypt.hash("password123", 10);
@@ -29,25 +32,48 @@ async function main() {
       passwordHash,
       notifications: {
         create: [
-          {
-            title: "Новый курс доступен",
-            message: "Курс React Start уже можно проходить."
-          },
-          {
-            title: "Проверь прогресс",
-            message: "После прохождения теста статистика обновится автоматически."
-          }
+          { title: "Новый курс доступен", message: "Курс React Start уже можно проходить." },
+          { title: "Проверь прогресс", message: "После прохождения теста статистика обновится автоматически." }
         ]
       }
     }
   });
 
-  await prisma.user.create({
+  const secondStudent = await prisma.user.create({
     data: {
-      name: "Admin",
+      name: "Ivan Petrov",
+      email: "ivan@student.local",
+      passwordHash
+    }
+  });
+
+  const teacher = await prisma.user.create({
+    data: {
+      name: "Anna Teacher",
+      email: "teacher@smartedu.local",
+      passwordHash,
+      role: "TEACHER",
+      notifications: {
+        create: {
+          title: "Группа назначена",
+          message: "Вы назначены преподавателем группы FE-101."
+        }
+      }
+    }
+  });
+
+  const admin = await prisma.user.create({
+    data: {
+      name: "Platform Admin",
       email: "admin@smartedu.local",
       passwordHash,
-      role: "ADMIN"
+      role: "ADMIN",
+      notifications: {
+        create: {
+          title: "Демо-данные готовы",
+          message: "Созданы пользователи, курсы и учебная группа."
+        }
+      }
     }
   });
 
@@ -87,10 +113,14 @@ async function main() {
                       attemptLimit: 2,
                       timeLimitMinutes: 10,
                       deadline: new Date("2026-12-31T20:59:59.000Z"),
+                      creatorId: teacher.id,
                       questions: {
                         create: [
                           {
                             text: "Что возвращает React-компонент?",
+                            type: "SINGLE_CHOICE",
+                            maxScore: 10,
+                            order: 1,
                             answers: {
                               create: [
                                 { text: "JSX-разметку", isCorrect: true },
@@ -101,6 +131,9 @@ async function main() {
                           },
                           {
                             text: "Как передаются данные в компонент?",
+                            type: "SINGLE_CHOICE",
+                            maxScore: 10,
+                            order: 2,
                             answers: {
                               create: [
                                 { text: "Через props", isCorrect: true },
@@ -108,6 +141,12 @@ async function main() {
                                 { text: "Через CSS selector", isCorrect: false }
                               ]
                             }
+                          },
+                          {
+                            text: "Объясните, когда компонент лучше вынести в отдельную часть интерфейса.",
+                            type: "MANUAL",
+                            maxScore: 20,
+                            order: 3
                           }
                         ]
                       }
@@ -121,25 +160,28 @@ async function main() {
             title: "Навигация и состояние",
             order: 2,
             lessons: {
-              create: [
-                {
-                  title: "Роутинг в приложении",
-                  type: "VIDEO",
-                  order: 1,
-                  duration: "15 мин",
-                  videoUrl,
-                  content: "React Router позволяет создавать страницы без перезагрузки."
-                }
-              ]
+              create: {
+                title: "Роутинг в приложении",
+                type: "VIDEO",
+                order: 1,
+                duration: "15 мин",
+                videoUrl,
+                content: "React Router позволяет создавать страницы без перезагрузки."
+              }
             }
           }
         ]
       }
     },
-    include: {
-      modules: {
-        include: { lessons: true }
-      }
+    include: { modules: { include: { lessons: true } } }
+  });
+
+  const group = await prisma.group.create({
+    data: {
+      title: "FE-101",
+      teacherId: teacher.id,
+      students: { connect: [{ id: student.id }, { id: secondStudent.id }] },
+      courses: { create: { courseId: course.id } }
     }
   });
 
@@ -183,7 +225,7 @@ async function main() {
     }
   });
 
-  console.log("Seed data created");
+  console.log(`Seed data created for ${group.title}: ${student.email}, ${secondStudent.email}, ${teacher.email}, ${admin.email}`);
 }
 
 main()

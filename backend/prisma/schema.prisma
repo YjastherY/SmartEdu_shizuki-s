@@ -9,6 +9,7 @@ datasource db {
 
 enum Role {
   STUDENT
+  TEACHER
   ADMIN
 }
 
@@ -16,6 +17,23 @@ enum LessonType {
   VIDEO
   TEXT
   TEST
+}
+
+enum QuestionType {
+  SINGLE_CHOICE
+  MULTIPLE_CHOICE
+  MATCHING
+  MANUAL
+}
+
+enum SubmissionStatus {
+  PENDING
+  GRADED
+}
+
+enum AttemptStatus {
+  GRADED
+  PENDING_REVIEW
 }
 
 model User {
@@ -26,13 +44,40 @@ model User {
   avatarUrl     String?
   role          Role           @default(STUDENT)
   darkMode      Boolean        @default(false)
+  groupId       String?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+  group         Group?         @relation("GroupStudents", fields: [groupId], references: [id], onDelete: SetNull)
+  teachingGroups Group[]       @relation("GroupTeacher")
+  createdTests  Test[]         @relation("TestCreator")
   progress      Progress[]
   comments      Comment[]
   notifications Notification[]
   certificates  Certificate[]
   testAttempts  TestAttempt[]
+  manualSubmissions ManualSubmission[]
+  deadlineExtensions DeadlineExtension[]
+}
+
+model Group {
+  id        String   @id @default(cuid())
+  title     String
+  teacherId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  teacher   User?    @relation("GroupTeacher", fields: [teacherId], references: [id], onDelete: SetNull)
+  students  User[]   @relation("GroupStudents")
+  courses   GroupCourse[]
+}
+
+model GroupCourse {
+  id       String @id @default(cuid())
+  groupId  String
+  courseId String
+  group    Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, courseId])
 }
 
 model Course {
@@ -48,6 +93,7 @@ model Course {
   modules     Module[]
   progress    Progress[]
   certificates Certificate[]
+  groups      GroupCourse[]
 }
 
 model Module {
@@ -82,17 +128,26 @@ model Test {
   timeLimitMinutes Int           @default(15)
   deadline         DateTime?
   lessonId         String        @unique
+  creatorId        String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
   lesson           Lesson        @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  creator          User?         @relation("TestCreator", fields: [creatorId], references: [id], onDelete: SetNull)
   questions        Question[]
   attempts         TestAttempt[]
+  deadlineExtensions DeadlineExtension[]
 }
 
 model Question {
   id        String   @id @default(cuid())
   text      String
+  type      QuestionType @default(SINGLE_CHOICE)
+  maxScore  Int      @default(10)
+  order     Int      @default(1)
   testId    String
   test      Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
   answers   Answer[]
+  submissions ManualSubmission[]
 }
 
 model Answer {
@@ -129,13 +184,48 @@ model LessonCompletion {
 }
 
 model TestAttempt {
+  id          String   @id @default(cuid())
+  userId      String
+  testId      String
+  score       Int
+  autoScore   Int      @default(0)
+  manualScore Int?
+  earnedPoints Int     @default(0)
+  totalPoints Int      @default(0)
+  status      AttemptStatus @default(GRADED)
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  test        Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
+  manualSubmissions ManualSubmission[]
+}
+
+model ManualSubmission {
+  id         String   @id @default(cuid())
+  userId     String
+  attemptId  String
+  questionId String
+  answer     String
+  score      Int?
+  maxScore   Int
+  feedback   String?
+  status     SubmissionStatus @default(PENDING)
+  createdAt  DateTime @default(now())
+  gradedAt   DateTime?
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attempt    TestAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+}
+
+model DeadlineExtension {
   id        String   @id @default(cuid())
   userId    String
   testId    String
-  score     Int
+  deadline  DateTime
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   test      Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, testId])
 }
 
 model Certificate {

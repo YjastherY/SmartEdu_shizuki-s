@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import express from "express";
 import morgan from "morgan";
 import { ZodError } from "zod";
+import adminRoutes from "./routes/admin.js";
 import authRoutes from "./routes/auth.js";
 import commentRoutes from "./routes/comments.js";
 import courseRoutes from "./routes/courses.js";
@@ -10,6 +11,7 @@ import lessonRoutes from "./routes/lessons.js";
 import meRoutes from "./routes/me.js";
 import notificationRoutes from "./routes/notifications.js";
 import progressRoutes from "./routes/progress.js";
+import teacherRoutes from "./routes/teacher.js";
 import testRoutes from "./routes/tests.js";
 import userRoutes from "./routes/users.js";
 
@@ -40,6 +42,8 @@ app.use("/api", testRoutes);
 app.use("/api", progressRoutes);
 app.use("/api", commentRoutes);
 app.use("/api", notificationRoutes);
+app.use("/api", teacherRoutes);
+app.use("/api", adminRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });

@@ -25,9 +25,9 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://smartedu:smartedu@postgres:5432/smartedu?schema=public
-      JWT_SECRET: change-this-secret-before-public-demo
+      JWT_SECRET: ${JWT_SECRET:-change-this-secret-before-public-demo}
       PORT: 4000
-      CLIENT_URL: http://192.168.31.125:3000
+      CLIENT_URL: ${CLIENT_URL:-http://localhost:3000}
     ports:
       - "4000:4000"
 
@@ -35,7 +35,7 @@ services:
     build:
       context: ./frontend
       args:
-        VITE_API_URL: http://192.168.31.125:4000/api
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:4000/api}
         VITE_MOCK_API: "false"
     container_name: smartedu-frontend
     restart: unless-stopped

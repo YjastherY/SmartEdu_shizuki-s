@@ -1,13 +1,32 @@
-# SmartEdu MVP
+# SmartEdu
 
-SmartEdu is a local MVP of an educational platform for online courses, video lessons, tests, progress tracking, notifications, comments, certificates, dark mode, and mobile-friendly usage.
+SmartEdu is an MVP educational platform for online courses, video lessons, tests, manual assessment, progress tracking, comments, notifications, role-based dashboards, dark mode, and responsive usage on desktop and mobile.
 
 ## Stack
 
 - Frontend: React, Vite, TailwindCSS, React Router
 - Backend: Node.js, Express, Prisma
-- Database: PostgreSQL in Docker
+- Database: PostgreSQL
 - Auth: JWT
+- Deployment: Docker Compose
+
+## Features
+
+- Student registration and login
+- Protected routes and JWT authorization
+- Course catalog with search and filtering
+- Course pages with modules and lessons
+- Video lessons and test lessons
+- Tests with attempts, time limit, deadline, best-score logic, and weighted questions
+- Question types: single choice, multiple choice, matching, manual answer
+- Manual grading for open-answer tasks with teacher feedback
+- Student progress, course statistics, and certificates foundation
+- Lesson comments
+- Notifications for students and teachers
+- Student profile and dark mode
+- Teacher dashboard for test creation, grading, groups, and student progress
+- Admin dashboard for roles, groups, and teacher assignment
+- Docker-based local/server setup
 
 ## Project Structure
 
@@ -27,19 +46,19 @@ SmartEdu is a local MVP of an educational platform for online courses, video les
 │       ├── context
 │       ├── pages
 │       └── services
-└── docker-compose.yml
+├── docker-compose.yml
+└── docker-compose.server.yml
 ```
 
 ## Local Setup
 
-
-1. Start PostgreSQL:
+Start PostgreSQL:
 
 ```bash
 docker compose up -d
 ```
 
-2. Configure backend:
+Configure and start the backend:
 
 ```bash
 cd backend
@@ -50,9 +69,13 @@ npm run prisma:seed
 npm run dev
 ```
 
-Backend runs on `http://localhost:4000`.
+Backend URL:
 
-3. Start frontend:
+```text
+http://localhost:4000
+```
+
+Start the frontend:
 
 ```bash
 cd frontend
@@ -60,86 +83,96 @@ npm install
 npm run dev
 ```
 
-Frontend runs on `http://localhost:5173`.
+Frontend URL:
 
-## Frontend-only Demo
+```text
+http://localhost:5173
+```
 
-If Docker or PostgreSQL is not installed yet, run the UI with mock data:
+## Frontend Demo Mode
+
+The frontend can run without PostgreSQL by using mock data:
 
 ```bash
 cd frontend
 VITE_MOCK_API=true npm run dev
 ```
 
-This mode supports login, course pages, lessons, tests, progress, comments, profile settings, notifications, and dark mode in the browser.
+Demo mode is useful for UI review and covers the student, teacher, and admin dashboards in the browser.
 
-## Server Setup With Docker
+## Docker Deployment
 
-This setup is intended for the Ubuntu server. It keeps SmartEdu separate from other projects such as `kokoChat`.
-
-Used ports:
-
-- Frontend: `http://192.168.31.125:3000`
-- Backend API: `http://192.168.31.125:4000/api`
-- Backend health check: `http://192.168.31.125:4000/api/health`
-- PostgreSQL is available only inside the Docker network
-
-On the server:
+Build and start the full application:
 
 ```bash
-cd ~/server-projects
-git clone git@github.com:YjastherY/SmartEdu_shizuki-s.git smartedu
-cd smartedu
-sudo docker compose -f docker-compose.server.yml up -d --build
+cp .env.server.example .env
+docker compose -f docker-compose.server.yml up -d --build
 ```
 
-Seed the demo data once after the containers start:
+For a remote server, set `CLIENT_URL` and `VITE_API_URL` in `.env` before building.
+
+Seed demo data after the containers start:
 
 ```bash
-sudo docker compose -f docker-compose.server.yml exec backend npm run prisma:seed
+docker compose -f docker-compose.server.yml exec backend npm run prisma:seed
 ```
 
-Useful server commands:
+Default Docker URLs:
 
-```bash
-sudo docker compose -f docker-compose.server.yml ps
-sudo docker compose -f docker-compose.server.yml logs -f backend
-sudo docker compose -f docker-compose.server.yml logs -f frontend
-sudo docker compose -f docker-compose.server.yml down
-sudo docker compose -f docker-compose.server.yml up -d --build
+```text
+Frontend: http://localhost:3000
+Backend API: http://localhost:4000/api
+Health check: http://localhost:4000/api/health
 ```
 
-To update from GitHub:
+Useful commands:
 
 ```bash
-cd ~/server-projects/smartedu
+docker compose -f docker-compose.server.yml ps
+docker compose -f docker-compose.server.yml logs -f backend
+docker compose -f docker-compose.server.yml logs -f frontend
+docker compose -f docker-compose.server.yml down
+```
+
+Update an existing deployment:
+
+```bash
 git pull
-sudo docker compose -f docker-compose.server.yml up -d --build
+docker compose -f docker-compose.server.yml up -d --build
 ```
 
-The current backend covers the basic MVP API: auth, courses, lessons, tests, progress, comments, notifications, profile settings. Some newer teacher/admin UI features are still implemented in frontend mock mode and should be moved to backend routes before a full production release.
+## Demo Accounts
 
-## Demo Account
+All demo accounts use the password:
 
-After running seed:
+```text
+password123
+```
 
-- Email: `student@smartedu.local`
-- Password: `password123`
+- Student: `student@smartedu.local`
+- Teacher: `teacher@smartedu.local`
+- Admin: `admin@smartedu.local`
 
-## Main Features
+## Core API
 
-- Register and login
-- Protected dashboard
-- Course catalog and filtering
-- Course details with modules and lessons
-- Lesson page with video player
-- Test submission and score calculation
-- User profile and settings
-- Progress statistics
-- Lesson comments
-- Notifications
-- Dark theme
-- Responsive layout
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `GET /api/me`
+- `GET /api/courses`
+- `GET /api/courses/:id`
+- `GET /api/lessons/:id`
+- `POST /api/tests/:id/submit`
+- `GET /api/progress/me`
+- `POST /api/comments`
+- `GET /api/notifications`
+- `PATCH /api/users/settings`
+- `GET /api/teacher/overview`
+- `POST /api/teacher/tests`
+- `PATCH /api/teacher/submissions/:id/grade`
+- `PATCH /api/teacher/students/:studentId/extensions/:testId`
+- `GET /api/admin/overview`
+- `PATCH /api/admin/users/:id/role`
+- `PATCH /api/admin/groups/:id`
 
 ## Useful Scripts
 
@@ -160,3 +193,12 @@ npm run dev
 npm run build
 npm run preview
 ```
+
+## Roadmap
+
+- Replace `prisma db push` in Docker with production migrations
+- Add file uploads for avatars and video materials
+- Add generated PDF certificates
+- Add WebSocket notifications and live student chat
+- Add CI checks for frontend build, backend linting, and API tests
+- Add HTTPS, domain configuration, and production secrets management

@@ -34,3 +34,11 @@ export function adminOnly(req, res, next) {
 
   next();
 }
+
+export function teacherOrAdmin(req, res, next) {
+  if (!["TEACHER", "ADMIN"].includes(req.user?.role)) {
+    return res.status(403).json({ message: "Teacher access required" });
+  }
+
+  next();
+}

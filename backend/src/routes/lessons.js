@@ -70,6 +70,16 @@ router.get(
       return res.status(404).json({ message: "Lesson not found" });
     }
 
+    if (lesson.test) {
+      const extension = await prisma.deadlineExtension.findUnique({
+        where: { userId_testId: { userId: req.user.id, testId: lesson.test.id } }
+      });
+      if (extension) {
+        lesson.test.deadline = extension.deadline;
+        lesson.test.extendedUntil = extension.deadline;
+      }
+    }
+
     res.json({ lesson });
   })
 );

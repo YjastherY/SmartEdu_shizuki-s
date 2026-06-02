@@ -147,6 +147,56 @@ export default function TestForm({ test, onSubmitted }) {
 function QuestionAnswer({ question, value, setAnswers }) {
   const type = question.type || "MULTIPLE_CHOICE";
 
+  if (type === "MATCHING") {
+    const selected = value || {};
+    const pairs = question.pairs?.length ? question.pairs : (question.answers || []).map((answer) => {
+      const [left, right] = answer.text.split("→").map((part) => part.trim());
+      return { left, right };
+    });
+    const rightOptions = pairs.map((pair) => pair.right);
+
+    return (
+      <div className="mt-3 space-y-2">
+        {pairs.map((pair, pairIndex) => (
+          <label key={pairIndex} className="grid gap-2 rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-800 sm:grid-cols-[1fr_1fr] sm:items-center">
+            <span className="font-medium">{pair.left || `Пункт ${pairIndex + 1}`}</span>
+            <select
+              className="input"
+              value={selected[pairIndex] || ""}
+              onChange={(event) => setAnswers((answers) => ({ ...answers, [question.id]: { ...selected, [pairIndex]: event.target.value } }))}
+            >
+              <option value="">Выберите соответствие</option>
+              {rightOptions.map((option, optionIndex) => <option key={optionIndex} value={option}>{option || `Вариант ${optionIndex + 1}`}</option>)}
+            </select>
+          </label>
+        ))}
+      </div>
+    );
+  }
+
+  if (type === "MULTIPLE_CHOICE" && question.answers?.length) {
+    const selected = Array.isArray(value) ? value : [];
+    return (
+      <div className="mt-3 space-y-2">
+        {question.answers.map((answer) => (
+          <label key={answer.id} className="flex cursor-pointer items-center gap-3 rounded-lg p-2 hover:bg-slate-50 dark:hover:bg-slate-800">
+            <input
+              type="checkbox"
+              checked={selected.includes(answer.id)}
+              onChange={() => {
+                const next = selected.includes(answer.id)
+                  ? selected.filter((item) => item !== answer.id)
+                  : [...selected, answer.id];
+                setAnswers((answers) => ({ ...answers, [question.id]: next }));
+              }}
+            />
+            <span className="text-sm">{answer.text}</span>
+          </label>
+        ))}
+      </div>
+    );
+  }
+
   if (question.answers?.length) {
     return (
       <div className="mt-3 space-y-2">
@@ -207,28 +257,6 @@ function QuestionAnswer({ question, value, setAnswers }) {
     );
   }
 
-  if (type === "MATCHING") {
-    const selected = value || {};
-    const rightOptions = question.pairs.map((pair) => pair.right);
-    return (
-      <div className="mt-3 space-y-2">
-        {question.pairs.map((pair, pairIndex) => (
-          <label key={pairIndex} className="grid gap-2 rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-800 sm:grid-cols-[1fr_1fr] sm:items-center">
-            <span className="font-medium">{pair.left || `Пункт ${pairIndex + 1}`}</span>
-            <select
-              className="input"
-              value={selected[pairIndex] || ""}
-              onChange={(event) => setAnswers((answers) => ({ ...answers, [question.id]: { ...selected, [pairIndex]: event.target.value } }))}
-            >
-              <option value="">Выберите соответствие</option>
-              {rightOptions.map((option, optionIndex) => <option key={optionIndex} value={option}>{option || `Вариант ${optionIndex + 1}`}</option>)}
-            </select>
-          </label>
-        ))}
-      </div>
-    );
-  }
-
   return (
     <textarea
       className="input mt-3 min-h-28"
@@ -250,10 +278,14 @@ function getBestScore(attempts) {
 
 function hasAnswer(question, value) {
   const type = question.type || "MULTIPLE_CHOICE";
-  if (question.answers?.length) return Boolean(value);
+  if (type === "MULTIPLE_CHOICE" && Array.isArray(value)) return value.length > 0;
   if (type === "SINGLE_CHOICE") return value !== undefined && value !== null && value !== "";
-  if (type === "MATCHING") return value && Object.values(value).filter(Boolean).length === question.pairs.length;
+  if (type === "MATCHING") {
+    const expected = question.pairs?.length || question.answers?.length || 0;
+    return value && Object.values(value).filter(Boolean).length === expected;
+  }
   if (type === "MANUAL") return typeof value === "string" && value.trim().length > 0;
+  if (question.answers?.length) return Boolean(value);
   if (Array.isArray(value)) return value.length > 0;
   return Boolean(value);
 }
