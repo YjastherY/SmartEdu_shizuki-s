@@ -53,12 +53,14 @@ const initialState = {
   notifications: [
     {
       id: "notification-1",
+      audience: "STUDENT",
       title: "Новый курс доступен",
       message: "Курс React Start уже можно проходить.",
       read: false
     },
     {
       id: "notification-2",
+      audience: "STUDENT",
       title: "Проверь прогресс",
       message: "После прохождения теста статистика обновится автоматически.",
       read: false
@@ -273,6 +275,11 @@ function getState() {
     totalPoints: item.totalPoints ?? 40,
     finalScore: item.finalScore ?? null
   }));
+  state.notifications = state.notifications.map((item) => ({
+    ...item,
+    audience: item.audience ?? (item.recipientId ? undefined : "STUDENT")
+  }));
+  syncTeacherNotifications(state);
   saveState(state);
   return hydrateProgress(state);
 }
@@ -379,6 +386,34 @@ function getBestScore(attempts) {
   return graded.length ? Math.max(...graded.map((attempt) => attempt.score)) : null;
 }
 
+function isNotificationForUser(notification, user) {
+  if (notification.recipientId) return notification.recipientId === user.id;
+  if (notification.audience) return notification.audience === user.role;
+  return true;
+}
+
+function syncTeacherNotifications(state) {
+  const existingIds = new Set(state.notifications.map((item) => item.id));
+  state.manualSubmissions
+    .filter((submission) => submission.status === "PENDING")
+    .forEach((submission) => {
+      const student = state.users.find((user) => user.id === submission.studentId);
+      const group = state.groups.find((item) => item.studentIds.includes(submission.studentId));
+      if (!group?.teacherId) return;
+      const id = `notification-review-${submission.id}`;
+      if (existingIds.has(id)) return;
+      state.notifications.unshift({
+        id,
+        recipientId: group.teacherId,
+        submissionId: submission.id,
+        title: "Работа на проверку",
+        message: `${student?.name || "Студент"} сдал(а) тест «${submission.testTitle}».`,
+        read: false
+      });
+      existingIds.add(id);
+    });
+}
+
 export async function mockApi(path, options = {}) {
   const state = getState();
   const body = options.body ? JSON.parse(options.body) : {};
@@ -405,11 +440,11 @@ export async function mockApi(path, options = {}) {
   }
 
   if (path === "/me") return { user: state.user };
-  if (path === "/notifications") return { notifications: state.notifications };
+  if (path === "/notifications") return { notifications: state.notifications.filter((item) => isNotificationForUser(item, state.user)) };
   if (path === "/notifications/read-all") {
-    state.notifications = state.notifications.map((item) => ({ ...item, read: true }));
+    state.notifications = state.notifications.map((item) => (isNotificationForUser(item, state.user) ? { ...item, read: true } : item));
     saveState(state);
-    return { notifications: state.notifications };
+    return { notifications: state.notifications.filter((item) => isNotificationForUser(item, state.user)) };
   }
   if (path === "/courses") return { courses };
   if (path.startsWith("/courses/")) {
@@ -494,6 +529,7 @@ export async function mockApi(path, options = {}) {
         totalPoints,
         finalScore: null
       });
+      syncTeacherNotifications(state);
     }
     if (!state.completedLessons.includes(lesson.id)) state.completedLessons.push(lesson.id);
     const course = courses.find((item) => item.modules.some((module) => module.lessons.some((candidate) => candidate.id === lesson.id)));
