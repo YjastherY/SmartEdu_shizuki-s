@@ -9,7 +9,7 @@ const tabs = [
 ];
 
 const emptyQuestion = {
-  type: "MULTIPLE_CHOICE",
+  type: "SINGLE_CHOICE",
   text: "",
   options: ["", ""],
   correctIndexes: [0],
@@ -295,6 +295,7 @@ function SubmissionCard({ item, grade, setGrade, gradeSubmission, compact = fals
   const feedback = currentGrade.feedback ?? item.feedback ?? "";
   const maxScore = Number(item.maxScore || 100);
   const quickScores = [0.5, 0.75, 0.9, 1].map((value) => Math.round(maxScore * value));
+  const manualAnswers = getManualAnswers(item);
 
   function updateGrade(patch) {
     setGrade({ ...grade, [item.id]: { ...currentGrade, ...patch } });
@@ -322,9 +323,13 @@ function SubmissionCard({ item, grade, setGrade, gradeSubmission, compact = fals
           {item.status === "PENDING" ? "На проверке" : "Проверено"}
         </span>
       </div>
-      <div className="mt-3 rounded-lg bg-white p-3 text-sm dark:bg-slate-900">
-        <p className="font-semibold">Развернутый ответ</p>
-        <p className="mt-1 text-slate-600 dark:text-slate-300">{item.answer}</p>
+      <div className="mt-3 space-y-2">
+        {manualAnswers.map((manualAnswer, index) => (
+          <div key={`${manualAnswer.question}-${index}`} className="rounded-lg bg-white p-3 text-sm dark:bg-slate-900">
+            <p className="font-semibold">{manualAnswer.question}</p>
+            <p className="mt-2 text-slate-600 dark:text-slate-300">{manualAnswer.answer}</p>
+          </div>
+        ))}
       </div>
       {!compact && (
         <div className="mt-3 space-y-2">
@@ -376,6 +381,13 @@ function SubmissionCard({ item, grade, setGrade, gradeSubmission, compact = fals
       )}
     </div>
   );
+}
+
+function getManualAnswers(item) {
+  if (item.manualAnswers?.length) return item.manualAnswers;
+  if (item.question) return [{ question: item.question, answer: item.answer }];
+  const [firstLine, ...rest] = String(item.answer || "").split("\n");
+  return [{ question: firstLine || "Развернутый ответ", answer: rest.join("\n").trim() || item.answer }];
 }
 
 function ProgressTab({ groups, selectedGroupId, selectedStudentId, selectedGroup, selectedStudent, setSelectedGroupId, setSelectedStudentId }) {
@@ -485,6 +497,7 @@ function Insight({ title, items, tone }) {
 function QuestionEditor({ index, question, onChange, onDelete }) {
   function changeType(type) {
     const presets = {
+      SINGLE_CHOICE: { options: question.options?.length ? question.options : ["", ""], correctIndexes: [question.correctIndexes?.[0] || 0] },
       MULTIPLE_CHOICE: { options: question.options?.length ? question.options : ["", ""], correctIndexes: question.correctIndexes?.length ? question.correctIndexes : [0] },
       MATCHING: { pairs: question.pairs?.length ? question.pairs : [{ left: "", right: "" }] },
       MANUAL: {}
@@ -500,7 +513,8 @@ function QuestionEditor({ index, question, onChange, onDelete }) {
       </div>
       <div className="grid gap-3 md:grid-cols-[180px_1fr_160px]">
         <select className="input" value={question.type} onChange={(event) => changeType(event.target.value)}>
-          <option value="MULTIPLE_CHOICE">Варианты</option>
+          <option value="SINGLE_CHOICE">Один вариант</option>
+          <option value="MULTIPLE_CHOICE">Несколько вариантов</option>
           <option value="MATCHING">Сопоставление</option>
           <option value="MANUAL">Развернутый ответ</option>
         </select>
@@ -517,16 +531,21 @@ function QuestionEditor({ index, question, onChange, onDelete }) {
         />
       </div>
 
-      {question.type === "MULTIPLE_CHOICE" && (
+      {(question.type === "SINGLE_CHOICE" || question.type === "MULTIPLE_CHOICE") && (
         <div className="mt-3 space-y-2">
           {question.options.map((option, optionIndex) => (
             <label key={optionIndex} className="flex items-center gap-2">
               <input
-                type="checkbox"
+                type={question.type === "SINGLE_CHOICE" ? "radio" : "checkbox"}
+                name={`question-${index}-correct`}
                 checked={question.correctIndexes.includes(optionIndex)}
                 onChange={() => {
-                  const exists = question.correctIndexes.includes(optionIndex);
-                  onChange({ correctIndexes: exists ? question.correctIndexes.filter((item) => item !== optionIndex) : [...question.correctIndexes, optionIndex] });
+                  if (question.type === "SINGLE_CHOICE") {
+                    onChange({ correctIndexes: [optionIndex] });
+                  } else {
+                    const exists = question.correctIndexes.includes(optionIndex);
+                    onChange({ correctIndexes: exists ? question.correctIndexes.filter((item) => item !== optionIndex) : [...question.correctIndexes, optionIndex] });
+                  }
                 }}
               />
               <input

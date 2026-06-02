@@ -166,6 +166,24 @@ function QuestionAnswer({ question, value, setAnswers }) {
     );
   }
 
+  if (type === "SINGLE_CHOICE") {
+    return (
+      <div className="mt-3 space-y-2">
+        {question.options.map((option, optionIndex) => (
+          <label key={optionIndex} className="flex cursor-pointer items-center gap-3 rounded-lg p-2 hover:bg-slate-50 dark:hover:bg-slate-800">
+            <input
+              type="radio"
+              name={question.id}
+              checked={value === optionIndex}
+              onChange={() => setAnswers((answers) => ({ ...answers, [question.id]: optionIndex }))}
+            />
+            <span className="text-sm">{option || `Вариант ${optionIndex + 1}`}</span>
+          </label>
+        ))}
+      </div>
+    );
+  }
+
   if (type === "MULTIPLE_CHOICE") {
     const selected = Array.isArray(value) ? value : [];
     return (
@@ -233,6 +251,7 @@ function getBestScore(attempts) {
 function hasAnswer(question, value) {
   const type = question.type || "MULTIPLE_CHOICE";
   if (question.answers?.length) return Boolean(value);
+  if (type === "SINGLE_CHOICE") return value !== undefined && value !== null && value !== "";
   if (type === "MATCHING") return value && Object.values(value).filter(Boolean).length === question.pairs.length;
   if (type === "MANUAL") return typeof value === "string" && value.trim().length > 0;
   if (Array.isArray(value)) return value.length > 0;

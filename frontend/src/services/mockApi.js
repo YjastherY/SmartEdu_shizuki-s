@@ -27,6 +27,7 @@ const initialState = {
       id: "submission-1",
       studentId: "user-4",
       testTitle: "Развернутый ответ по компонентам",
+      question: "Зачем выносить интерфейс в отдельный компонент?",
       answer: "Компонент нужен, чтобы разбить интерфейс на переиспользуемые части.",
       status: "PENDING",
       score: null,
@@ -109,7 +110,7 @@ const courses = [
               questions: [
                 {
                   id: "question-1",
-                  type: "MULTIPLE_CHOICE",
+                  type: "SINGLE_CHOICE",
                   text: "Что возвращает React-компонент?",
                   maxScore: 10,
                   answers: [
@@ -120,7 +121,7 @@ const courses = [
                 },
                 {
                   id: "question-2",
-                  type: "MULTIPLE_CHOICE",
+                  type: "SINGLE_CHOICE",
                   text: "Как передаются данные в компонент?",
                   maxScore: 10,
                   answers: [
@@ -253,6 +254,7 @@ function getState() {
       id: "submission-2",
       studentId: "user-1",
       testTitle: "Связь props и состояния",
+      question: "Чем props отличаются от состояния компонента?",
       answer: "Props передаются сверху вниз, а состояние хранится внутри компонента и меняется через setState или hooks.",
       status: "PENDING",
       score: null,
@@ -265,6 +267,7 @@ function getState() {
   }
   state.manualSubmissions = state.manualSubmissions.map((item) => ({
     ...item,
+    question: item.question ?? (item.id === "submission-2" ? "Чем props отличаются от состояния компонента?" : "Зачем выносить интерфейс в отдельный компонент?"),
     maxScore: item.maxScore ?? (item.id === "submission-2" ? 15 : 20),
     autoScore: item.autoScore ?? (item.id === "submission-2" ? 25 : 18),
     totalPoints: item.totalPoints ?? 40,
@@ -341,6 +344,9 @@ function isAutoCorrect(question, answer) {
   if (question.answers?.length) {
     return question.answers.some((item) => item.id === answer && item.isCorrect);
   }
+  if (question.type === "SINGLE_CHOICE") {
+    return question.correctIndexes?.[0] === answer;
+  }
   if (question.type === "MULTIPLE_CHOICE") {
     const selected = Array.isArray(answer) ? answer : [];
     const correct = question.correctIndexes || [];
@@ -355,6 +361,9 @@ function isAutoCorrect(question, answer) {
 function getAnswerText(question, answer) {
   if (question.answers?.length) {
     return question.answers.find((item) => item.id === answer)?.text || "Без ответа";
+  }
+  if (question.type === "SINGLE_CHOICE") {
+    return question.options[answer] || "Без ответа";
   }
   if (question.type === "MULTIPLE_CHOICE") {
     return (Array.isArray(answer) ? answer : []).map((index) => question.options[index]).filter(Boolean).join(", ") || "Без ответа";
@@ -471,7 +480,12 @@ export async function mockApi(path, options = {}) {
         testId,
         attemptId,
         testTitle: lesson.test.title,
-        answer: manualQuestions.map((question) => `${question.text}\n${body.answers[question.id] || "Без ответа"}`).join("\n\n"),
+        question: manualQuestions.length === 1 ? manualQuestions[0].text : "Развернутые ответы",
+        answer: manualQuestions.map((question) => body.answers[question.id] || "Без ответа").join("\n\n"),
+        manualAnswers: manualQuestions.map((question) => ({
+          question: question.text,
+          answer: body.answers[question.id] || "Без ответа"
+        })),
         answers: otherAnswers,
         status: "PENDING",
         score: null,
