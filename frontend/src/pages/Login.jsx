@@ -5,8 +5,8 @@ import { useAuth } from "../context/AuthContext.jsx";
 
 const demoAccounts = [
   { label: "Студент", email: "student@smartedu.local" },
-  { label: "Препод", email: "teacher@smartedu.local" },
-  { label: "Админ", email: "admin@smartedu.local" }
+  { label: "Преподаватель", email: "teacher@smartedu.local" },
+  { label: "Администратор", email: "admin@smartedu.local" }
 ];
 
 export default function Login() {

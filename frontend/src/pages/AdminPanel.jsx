@@ -68,8 +68,8 @@ export default function AdminPanel() {
                   </div>
                   <select className="input sm:w-40" value={user.role} onChange={(event) => setRole(user.id, event.target.value)}>
                     <option value="STUDENT">Студент</option>
-                    <option value="TEACHER">Препод</option>
-                    <option value="ADMIN">Админ</option>
+                    <option value="TEACHER">Преподаватель</option>
+                    <option value="ADMIN">Администратор</option>
                   </select>
                 </div>
               </div>

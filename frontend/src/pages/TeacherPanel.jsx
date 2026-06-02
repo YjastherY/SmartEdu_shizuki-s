@@ -69,6 +69,14 @@ export default function TeacherPanel() {
     }));
   }
 
+  async function extendDeadline(studentId, assignmentId, deadline) {
+    await api(`/teacher/students/${studentId}/extensions/${assignmentId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ deadline })
+    });
+    setData(await api("/teacher/overview"));
+  }
+
   function updateQuestion(index, patch) {
     setDraft((value) => ({
       ...value,
@@ -137,6 +145,7 @@ export default function TeacherPanel() {
             setSelectedStudentId(group?.students[0]?.id || "");
           }}
           setSelectedStudentId={setSelectedStudentId}
+          extendDeadline={extendDeadline}
         />
       )}
     </div>
@@ -390,7 +399,7 @@ function getManualAnswers(item) {
   return [{ question: firstLine || "Развернутый ответ", answer: rest.join("\n").trim() || item.answer }];
 }
 
-function ProgressTab({ groups, selectedGroupId, selectedStudentId, selectedGroup, selectedStudent, setSelectedGroupId, setSelectedStudentId }) {
+function ProgressTab({ groups, selectedGroupId, selectedStudentId, selectedGroup, selectedStudent, setSelectedGroupId, setSelectedStudentId, extendDeadline }) {
   return (
     <section className="grid gap-6 xl:grid-cols-[320px_1fr]">
       <div className="panel space-y-4">
@@ -425,7 +434,7 @@ function ProgressTab({ groups, selectedGroupId, selectedStudentId, selectedGroup
 
       <div className="panel">
         {selectedStudent ? (
-          <StudentDetails student={selectedStudent} />
+          <StudentDetails student={selectedStudent} extendDeadline={extendDeadline} />
         ) : (
           <div className="min-h-40" />
         )}
@@ -434,7 +443,13 @@ function ProgressTab({ groups, selectedGroupId, selectedStudentId, selectedGroup
   );
 }
 
-function StudentDetails({ student }) {
+function StudentDetails({ student, extendDeadline }) {
+  const [extensionDates, setExtensionDates] = useState({});
+
+  function setDate(assignmentId, deadline) {
+    setExtensionDates((value) => ({ ...value, [assignmentId]: deadline }));
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -489,8 +504,59 @@ function StudentDetails({ student }) {
           </div>
         </div>
       </div>
+      <div>
+        <h3 className="mb-3 font-bold">Сроки заданий</h3>
+        <div className="space-y-2">
+          {student.assignments.map((assignment) => (
+            <div key={assignment.id} className="rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-800">
+              <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <p className="font-semibold">{assignment.title}</p>
+                  <p className="text-slate-500 dark:text-slate-300">{assignment.course} • до {new Date(assignment.effectiveDate).toLocaleDateString("ru-RU")}</p>
+                </div>
+                <StatusBadge assignment={assignment} />
+              </div>
+              {!assignment.submitted && (
+                <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
+                  <input
+                    className="input"
+                    type="date"
+                    value={extensionDates[assignment.id] || assignment.extendedUntil || getDefaultExtensionDate()}
+                    onChange={(event) => setDate(assignment.id, event.target.value)}
+                  />
+                  <button className="btn-secondary" onClick={() => extendDeadline(student.id, assignment.id, extensionDates[assignment.id] || assignment.extendedUntil || getDefaultExtensionDate())}>
+                    Продлить
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
+}
+
+function getDefaultExtensionDate() {
+  const date = new Date();
+  date.setDate(date.getDate() + 7);
+  return date.toISOString().slice(0, 10);
+}
+
+function StatusBadge({ assignment }) {
+  const labels = {
+    SUBMITTED: "Сдано",
+    OVERDUE: "Просрочено",
+    EXTENDED: "Продлено",
+    ACTIVE: "Активно"
+  };
+  const className = assignment.status === "OVERDUE"
+    ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-100"
+    : assignment.status === "SUBMITTED"
+      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-100"
+      : "bg-brand-100 text-brand-700 dark:bg-brand-950 dark:text-brand-100";
+
+  return <span className={`w-fit rounded-full px-2 py-1 text-xs font-semibold ${className}`}>{labels[assignment.status]}</span>;
 }
 
 function Insight({ title, courses, tone }) {

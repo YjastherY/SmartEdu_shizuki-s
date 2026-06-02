@@ -22,6 +22,7 @@ const initialState = {
     { id: "group-2", title: "BE-201", teacherId: "user-2", courseIds: ["course-2"], studentIds: ["user-5"] }
   ],
   customTests: [],
+  deadlineExtensions: {},
   manualSubmissions: [
     {
       id: "submission-1",
@@ -207,6 +208,10 @@ const studentInsights = {
     recentAnswers: [
       { question: "Что возвращает React-компонент?", answer: "JSX-разметку", result: "Верно" },
       { question: "Как передаются данные в компонент?", answer: "Через props", result: "Верно" }
+    ],
+    assignments: [
+      { id: "test-1", title: "React Components Quiz", course: "React Start", dueDate: "2026-12-31", submitted: true },
+      { id: "lesson-3-practice", title: "Практика по роутингу", course: "React Start", dueDate: "2026-06-15", submitted: false }
     ]
   },
   "user-4": {
@@ -223,6 +228,10 @@ const studentInsights = {
     recentAnswers: [
       { question: "Что возвращает React-компонент?", answer: "UI-блок", result: "Частично" },
       { question: "Как передаются данные в компонент?", answer: "Через props", result: "Верно" }
+    ],
+    assignments: [
+      { id: "test-1", title: "React Components Quiz", course: "React Start", dueDate: "2026-12-31", submitted: true },
+      { id: "lesson-3-practice", title: "Практика по роутингу", course: "React Start", dueDate: "2026-05-20", submitted: false }
     ]
   },
   "user-5": {
@@ -239,6 +248,10 @@ const studentInsights = {
     recentAnswers: [
       { question: "Что делает Express?", answer: "Создает HTTP API", result: "Верно" },
       { question: "Где хранится токен?", answer: "В базе", result: "Неверно" }
+    ],
+    assignments: [
+      { id: "express-test-1", title: "Express Basics", course: "Backend API на Node.js", dueDate: "2026-05-25", submitted: true },
+      { id: "jwt-practice", title: "Практика по JWT", course: "Backend API на Node.js", dueDate: "2026-05-28", submitted: false }
     ]
   }
 };
@@ -265,6 +278,21 @@ function buildGrades(state, studentId, insight) {
   });
 }
 
+function buildAssignments(state, studentId, insight) {
+  const extensions = state.deadlineExtensions?.[studentId] || {};
+  return (insight.assignments || []).map((assignment) => {
+    const extendedUntil = extensions[assignment.id] || null;
+    const effectiveDate = extendedUntil || assignment.dueDate;
+    const isOverdue = !assignment.submitted && new Date(`${effectiveDate}T23:59:59`) < new Date();
+    return {
+      ...assignment,
+      effectiveDate,
+      extendedUntil,
+      status: assignment.submitted ? "SUBMITTED" : isOverdue ? "OVERDUE" : extendedUntil ? "EXTENDED" : "ACTIVE"
+    };
+  });
+}
+
 function buildStudentRow(state, student, index) {
   const group = state.groups.find((item) => item.id === student.groupId);
   const insight = studentInsights[student.id] || studentInsights["user-1"];
@@ -277,13 +305,15 @@ function buildStudentRow(state, student, index) {
     bestScore: index === 0 ? 100 : index === 1 ? 78 : 55,
     pending: state.manualSubmissions.filter((item) => item.studentId === student.id && item.status === "PENDING").length,
     ...insight,
-    grades: buildGrades(state, student.id, insight)
+    grades: buildGrades(state, student.id, insight),
+    assignments: buildAssignments(state, student.id, insight)
   };
 }
 
 function getState() {
   const saved = localStorage.getItem("smartedu_mock_state");
   const state = saved ? { ...initialState, ...JSON.parse(saved) } : initialState;
+  state.deadlineExtensions = state.deadlineExtensions || {};
   if (!state.manualSubmissions.some((item) => item.id === "submission-2")) {
     state.manualSubmissions.push({
       id: "submission-2",
@@ -652,6 +682,28 @@ export async function mockApi(path, options = {}) {
     }
     saveState(state);
     return { submission: state.manualSubmissions.find((item) => item.id === id) };
+  }
+  if (path.startsWith("/teacher/students/") && path.includes("/extensions/")) {
+    const [, , , studentId, , assignmentId] = path.split("/");
+    state.deadlineExtensions = {
+      ...state.deadlineExtensions,
+      [studentId]: {
+        ...(state.deadlineExtensions?.[studentId] || {}),
+        [assignmentId]: body.deadline
+      }
+    };
+    const student = state.users.find((user) => user.id === studentId);
+    const insight = studentInsights[studentId] || studentInsights["user-1"];
+    const assignment = insight.assignments?.find((item) => item.id === assignmentId);
+    state.notifications.unshift({
+      id: `notification-extension-${studentId}-${assignmentId}-${Date.now()}`,
+      recipientId: studentId,
+      title: "Срок задания продлён",
+      message: `Преподаватель продлил срок задания «${assignment?.title || "Задание"}» до ${new Date(body.deadline).toLocaleDateString("ru-RU")}.`,
+      read: false
+    });
+    saveState(state);
+    return { assignments: buildAssignments(state, studentId, insight), student };
   }
   if (path === "/admin/overview") {
     return {
