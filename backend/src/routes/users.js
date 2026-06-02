@@ -43,12 +43,15 @@ router.patch(
   authRequired,
   asyncHandler(async (req, res) => {
     const data = settingsSchema.parse(req.body);
+    const updateData = { ...data };
+
+    if (Object.hasOwn(updateData, "avatarUrl")) {
+      updateData.avatarUrl = updateData.avatarUrl === "" ? null : updateData.avatarUrl;
+    }
+
     const user = await prisma.user.update({
       where: { id: req.user.id },
-      data: {
-        ...data,
-        avatarUrl: data.avatarUrl === "" ? null : data.avatarUrl
-      }
+      data: updateData
     });
 
     res.json({ user: publicUser(user) });

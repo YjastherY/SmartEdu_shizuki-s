@@ -1,18 +1,35 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { assetUrl } from "../services/api.js";
 
 export default function Profile() {
   const { user, updateSettings, uploadAvatar } = useAuth();
-  const [form, setForm] = useState({ name: user.name, avatarUrl: user.avatarUrl || "" });
+  const [form, setForm] = useState({
+    name: user.name,
+    avatarUrl: user.avatarUrl?.startsWith("http") ? user.avatarUrl : ""
+  });
   const [message, setMessage] = useState("");
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState("");
   const [uploading, setUploading] = useState(false);
 
+  useEffect(() => {
+    setForm({
+      name: user.name,
+      avatarUrl: user.avatarUrl?.startsWith("http") ? user.avatarUrl : ""
+    });
+  }, [user]);
+
   async function handleSubmit(event) {
     event.preventDefault();
-    await updateSettings(form);
+    const settings = { name: form.name };
+    const externalAvatar = form.avatarUrl.trim();
+
+    if (externalAvatar) {
+      settings.avatarUrl = externalAvatar;
+    }
+
+    await updateSettings(settings);
     setMessage("Профиль обновлен");
   }
 
@@ -31,7 +48,10 @@ export default function Profile() {
     setUploading(true);
     try {
       const updatedUser = await uploadAvatar(avatarFile);
-      setForm((value) => ({ ...value, avatarUrl: updatedUser.avatarUrl || "" }));
+      setForm((value) => ({
+        ...value,
+        avatarUrl: updatedUser.avatarUrl?.startsWith("http") ? updatedUser.avatarUrl : ""
+      }));
       setAvatarFile(null);
       setAvatarPreview("");
       setMessage("Аватар обновлен");
@@ -59,7 +79,7 @@ export default function Profile() {
       <form className="panel space-y-4 hover:shadow-md" onSubmit={handleSubmit}>
         <div>
           <h2 className="text-xl font-bold">Настройки профиля</h2>
-          <p className="text-sm text-slate-500">Измените имя и ссылку на аватар.</p>
+          <p className="text-sm text-slate-500">Измените имя или загрузите новый аватар.</p>
         </div>
         <label className="block text-sm font-medium">
           Имя
@@ -75,7 +95,7 @@ export default function Profile() {
           </button>
         </div>
         <label className="block text-sm font-medium">
-          Ссылка на аватар
+          Ссылка на аватар, если файл не нужен
           <input className="input mt-1" value={form.avatarUrl} onChange={(event) => setForm({ ...form, avatarUrl: event.target.value })} />
         </label>
         <button className="btn-primary">Сохранить</button>
