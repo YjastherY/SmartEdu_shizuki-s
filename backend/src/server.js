@@ -56,8 +56,8 @@ app.use((req, res) => {
 app.use((error, req, res, next) => {
   if (error instanceof ZodError) {
     return res.status(400).json({
-      message: "Validation error",
-      issues: error.errors
+      message: error.issues?.[0]?.message || "Validation error",
+      issues: error.issues
     });
   }
 

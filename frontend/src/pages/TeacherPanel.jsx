@@ -28,17 +28,19 @@ export default function TeacherPanel() {
     attemptLimit: 2,
     timeLimitMinutes: 20,
     deadline: "2026-12-31",
-    courseId: "course-1",
+    courseId: "",
     questions: [{ ...emptyQuestion }]
   });
   const [grade, setGrade] = useState({});
   const [saved, setSaved] = useState("");
+  const [savingTest, setSavingTest] = useState(false);
 
   useEffect(() => {
     api("/teacher/overview").then((result) => {
       setData(result);
       setSelectedGroupId(result.groups[0]?.id || "");
       setSelectedStudentId(result.groups[0]?.students[0]?.id || "");
+      setDraft((value) => ({ ...value, courseId: value.courseId || result.courses[0]?.id || "" }));
     });
   }, []);
 
@@ -53,9 +55,29 @@ export default function TeacherPanel() {
 
   async function saveTest(event) {
     event.preventDefault();
-    const result = await api("/teacher/tests", { method: "POST", body: JSON.stringify(draft) });
-    setData((value) => ({ ...value, customTests: [result.test, ...value.customTests] }));
-    setSaved("Тест сохранен");
+    setSaved("");
+
+    if (!draft.courseId) {
+      setSaved("Сначала выберите курс");
+      return;
+    }
+
+    const validationError = validateTestDraft(draft);
+    if (validationError) {
+      setSaved(validationError);
+      return;
+    }
+
+    setSavingTest(true);
+    try {
+      const result = await api("/teacher/tests", { method: "POST", body: JSON.stringify(normalizeTestDraft(draft)) });
+      setData((value) => ({ ...value, customTests: [result.test, ...value.customTests] }));
+      setSaved("Тест сохранен");
+    } catch (error) {
+      setSaved(error.message || "Не удалось сохранить тест");
+    } finally {
+      setSavingTest(false);
+    }
   }
 
   async function gradeSubmission(id) {
@@ -115,6 +137,7 @@ export default function TeacherPanel() {
           courses={courses}
           draft={draft}
           saved={saved}
+          savingTest={savingTest}
           questionSummary={questionSummary}
           setDraft={setDraft}
           saveTest={saveTest}
@@ -152,7 +175,46 @@ export default function TeacherPanel() {
   );
 }
 
-function TestEditor({ courses, draft, saved, questionSummary, setDraft, saveTest, updateQuestion }) {
+function normalizeTestDraft(draft) {
+  return {
+    ...draft,
+    title: draft.title.trim(),
+    description: draft.description.trim(),
+    attemptLimit: Number(draft.attemptLimit || 1),
+    timeLimitMinutes: Number(draft.timeLimitMinutes || 1),
+    questions: draft.questions.map((question) => ({
+      ...question,
+      text: question.text.trim(),
+      maxScore: Number(question.maxScore || 1),
+      options: question.options?.map((option) => option.trim()),
+      pairs: question.pairs?.map((pair) => ({ left: pair.left.trim(), right: pair.right.trim() })).filter((pair) => pair.left && pair.right)
+    }))
+  };
+}
+
+function validateTestDraft(draft) {
+  if (draft.title.trim().length < 3) return "Введите название теста";
+
+  for (const [index, question] of draft.questions.entries()) {
+    if (question.text.trim().length < 3) return `Заполните текст задания ${index + 1}`;
+    if (Number(question.maxScore || 0) < 1) return `Укажите баллы для задания ${index + 1}`;
+
+    if (question.type === "SINGLE_CHOICE" || question.type === "MULTIPLE_CHOICE") {
+      const filledOptions = question.options.map((option) => option.trim()).filter(Boolean);
+      if (filledOptions.length < 2) return `Добавьте минимум два варианта в задании ${index + 1}`;
+      if (!question.correctIndexes.length) return `Отметьте правильный ответ в задании ${index + 1}`;
+    }
+
+    if (question.type === "MATCHING") {
+      const filledPairs = question.pairs.filter((pair) => pair.left.trim() && pair.right.trim());
+      if (!filledPairs.length) return `Добавьте пару для сопоставления в задании ${index + 1}`;
+    }
+  }
+
+  return "";
+}
+
+function TestEditor({ courses, draft, saved, savingTest, questionSummary, setDraft, saveTest, updateQuestion }) {
   return (
     <form className="panel space-y-5" onSubmit={saveTest}>
       <div>
@@ -169,6 +231,7 @@ function TestEditor({ courses, draft, saved, questionSummary, setDraft, saveTest
         <label className="text-sm font-medium">
           Курс
           <select className="input mt-1" value={draft.courseId} onChange={(event) => setDraft({ ...draft, courseId: event.target.value })}>
+            <option value="" disabled>Выберите курс</option>
             {courses.map((course) => <option key={course.id} value={course.id}>{course.title}</option>)}
           </select>
         </label>
@@ -206,9 +269,9 @@ function TestEditor({ courses, draft, saved, questionSummary, setDraft, saveTest
         <button type="button" className="btn-secondary flex items-center gap-2" onClick={() => setDraft((value) => ({ ...value, questions: [...value.questions, { ...emptyQuestion }] }))}>
           <Plus size={16} /> Добавить задание
         </button>
-        <button className="btn-primary">Сохранить тест</button>
+        <button className="btn-primary" disabled={savingTest}>{savingTest ? "Сохраняем..." : "Сохранить тест"}</button>
       </div>
-      {saved && <p className="text-sm font-semibold text-emerald-600">{saved}</p>}
+      {saved && <p className={`text-sm font-semibold ${saved === "Тест сохранен" ? "text-emerald-600" : "text-red-600"}`}>{saved}</p>}
     </form>
   );
 }

@@ -29,8 +29,12 @@ export default function Profile() {
       settings.avatarUrl = externalAvatar;
     }
 
-    await updateSettings(settings);
-    setMessage("Профиль обновлен");
+    try {
+      await updateSettings(settings);
+      setMessage("Профиль обновлен");
+    } catch (error) {
+      setMessage(error.message || "Не удалось сохранить профиль");
+    }
   }
 
   async function handleAvatarChange(event) {
@@ -55,6 +59,8 @@ export default function Profile() {
       setAvatarFile(null);
       setAvatarPreview("");
       setMessage("Аватар обновлен");
+    } catch (error) {
+      setMessage(error.message || "Не удалось загрузить аватар");
     } finally {
       setUploading(false);
     }
@@ -99,7 +105,11 @@ export default function Profile() {
           <input className="input mt-1" value={form.avatarUrl} onChange={(event) => setForm({ ...form, avatarUrl: event.target.value })} />
         </label>
         <button className="btn-primary">Сохранить</button>
-        {message && <p className="text-sm font-semibold text-emerald-600">{message}</p>}
+        {message && (
+          <p className={`text-sm font-semibold ${message.includes("Не удалось") ? "text-red-600" : "text-emerald-600"}`}>
+            {message}
+          </p>
+        )}
       </form>
     </div>
   );
