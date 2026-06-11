@@ -52,9 +52,11 @@ Use this script for the final SmartEdu presentation.
 2. Show backend health endpoint: `/api/health`.
 3. Show CI workflow in `.github/workflows/ci.yml`.
 4. Show Docker deployment command.
-5. Mention persisted uploads for avatars and videos through Docker volume.
+5. Run or show `npm run smoke` against the deployed Docker frontend.
+6. Show structured backend logs with request ids.
+7. Mention persisted uploads for avatars and videos through Docker volume.
 
 ## 6. Closing
 
-- Implemented core plan: auth, courses, lessons, tests, progress, certificates, comments, WebSocket notifications, live chat, dark mode, responsive UI, teacher/admin roles, Docker deploy, CI, and QA documentation.
+- Implemented core plan: auth, courses, lessons, tests, progress, certificates, comments, WebSocket notifications, live chat, dark mode, responsive UI, teacher/admin roles, Docker deploy, structured logs, CI, and QA documentation.
 - Future improvements: production migrations, PDF certificates, API integration tests, HTTPS and domain setup.

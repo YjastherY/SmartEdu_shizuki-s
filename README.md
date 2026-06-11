@@ -136,6 +136,13 @@ docker compose -f docker-compose.server.yml logs -f frontend
 docker compose -f docker-compose.server.yml down
 ```
 
+Run an automated smoke test against Docker or a deployed server:
+
+```bash
+cd backend
+SMARTEDU_BASE_URL=http://localhost:3000 npm run smoke
+```
+
 Update an existing deployment:
 
 ```bash
@@ -201,6 +208,7 @@ Backend:
 ```bash
 npm run dev
 npm run start
+npm run smoke
 npm run prisma:migrate
 npm run prisma:generate
 npm run prisma:seed
@@ -218,6 +226,14 @@ npm run preview
 
 - [QA Test Plan](docs/QA.md)
 - [Demo Script](docs/DEMO.md)
+
+## Logging
+
+The backend writes structured JSON logs to stdout. Each HTTP request includes a generated `x-request-id`, status code, response time, method, and URL. Docker users can inspect logs with:
+
+```bash
+docker compose -f docker-compose.server.yml logs -f backend
+```
 
 ## Roadmap
 

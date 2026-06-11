@@ -36,3 +36,7 @@ jobs:
         working-directory: backend
       - run: node --check src/server.js
         working-directory: backend
+      - run: node --check src/logger.js
+        working-directory: backend
+      - run: node --check scripts/smoke.js
+        working-directory: backend

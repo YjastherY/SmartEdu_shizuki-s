@@ -78,5 +78,7 @@ This checklist covers the MVP flows required for SmartEdu acceptance testing.
 - Run `docker compose -f docker-compose.server.yml up -d --build`.
 - Confirm `docker compose -f docker-compose.server.yml ps` shows all services running.
 - Confirm `GET /api/health` returns `{"status":"ok","service":"smartedu-api"}`.
+- Run `SMARTEDU_BASE_URL=http://localhost:3000 npm run smoke` from `backend`.
 - Log in through the deployed frontend.
 - Open one student, teacher, and admin page.
+- Check backend logs and confirm requests include JSON fields such as `requestId`, `method`, `url`, `status`, and `responseTimeMs`.

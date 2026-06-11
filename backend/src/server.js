@@ -1,7 +1,6 @@
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
-import morgan from "morgan";
 import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,6 +18,7 @@ import progressRoutes from "./routes/progress.js";
 import teacherRoutes from "./routes/teacher.js";
 import testRoutes from "./routes/tests.js";
 import userRoutes from "./routes/users.js";
+import { logger, requestId, requestLogger } from "./logger.js";
 import { attachRealtime } from "./realtime.js";
 
 dotenv.config();
@@ -34,7 +34,8 @@ app.use(
   })
 );
 app.use(express.json());
-app.use(morgan("dev"));
+app.use(requestId);
+app.use(requestLogger());
 app.use("/uploads", express.static(path.join(rootDir, "uploads")));
 
 app.get("/api/health", (req, res) => {
@@ -73,7 +74,13 @@ app.use((error, req, res, next) => {
     });
   }
 
-  console.error(error);
+  logger.error("request_failed", {
+    requestId: req.id,
+    method: req.method,
+    url: req.originalUrl,
+    error: error.message,
+    stack: process.env.NODE_ENV === "production" ? undefined : error.stack
+  });
   res.status(500).json({ message: "Internal server error" });
 });
 
@@ -81,5 +88,5 @@ const server = http.createServer(app);
 attachRealtime(server);
 
 server.listen(port, () => {
-  console.log(`SmartEdu API is running on http://localhost:${port}`);
+  logger.info("server_started", { port, service: "smartedu-api" });
 });
