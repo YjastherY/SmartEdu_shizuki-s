@@ -66,6 +66,57 @@ async function expectForbidden(path, token) {
   }
 }
 
+async function verifyContentCrud(token) {
+  const stamp = Date.now();
+  const createdCourse = await authorized("/api/courses", token, {
+    method: "POST",
+    body: JSON.stringify({
+      title: `Smoke Course ${stamp}`,
+      description: "Temporary course created by SmartEdu smoke test.",
+      category: "QA",
+      level: "Smoke",
+      duration: "1 час",
+      imageUrl: ""
+    })
+  });
+
+  try {
+    const createdModule = await authorized(`/api/courses/${createdCourse.course.id}/modules`, token, {
+      method: "POST",
+      body: JSON.stringify({ title: "Smoke Module" })
+    });
+    if (!createdModule.module?.id) throw new Error("Module CRUD create failed");
+
+    const updatedModule = await authorized(`/api/modules/${createdModule.module.id}`, token, {
+      method: "PUT",
+      body: JSON.stringify({ title: "Smoke Module Updated" })
+    });
+    if (updatedModule.module.title !== "Smoke Module Updated") throw new Error("Module CRUD update failed");
+
+    const createdLesson = await authorized(`/api/modules/${createdModule.module.id}/lessons`, token, {
+      method: "POST",
+      body: JSON.stringify({
+        title: "Smoke Lesson",
+        type: "TEXT",
+        duration: "5 мин",
+        content: "Smoke lesson content"
+      })
+    });
+    if (!createdLesson.lesson?.id) throw new Error("Lesson CRUD create failed");
+
+    const updatedLesson = await authorized(`/api/lessons/${createdLesson.lesson.id}`, token, {
+      method: "PUT",
+      body: JSON.stringify({ title: "Smoke Lesson Updated" })
+    });
+    if (updatedLesson.lesson.title !== "Smoke Lesson Updated") throw new Error("Lesson CRUD update failed");
+
+    await authorized(`/api/lessons/${createdLesson.lesson.id}`, token, { method: "DELETE" });
+    await authorized(`/api/modules/${createdModule.module.id}`, token, { method: "DELETE" });
+  } finally {
+    await authorized(`/api/courses/${createdCourse.course.id}`, token, { method: "DELETE" });
+  }
+}
+
 async function verifyWebSocket(token) {
   await new Promise((resolve, reject) => {
     const socket = new WebSocket(wsUrl(token));
@@ -104,6 +155,7 @@ async function main() {
   await authorized("/api/teacher/overview", teacher.token);
   await authorized("/api/admin/overview", admin.token);
   await expectForbidden("/api/admin/overview", teacher.token);
+  await verifyContentCrud(admin.token);
 
   const chat = await authorized("/api/chat/messages", student.token);
   if (!Array.isArray(chat.messages)) throw new Error("Chat response must contain messages array");
@@ -119,7 +171,7 @@ async function main() {
   console.log(JSON.stringify({
     status: "ok",
     baseUrl,
-    checks: ["health", "auth", "courses", "progress", "teacher", "admin", "access-control", "chat", "assistant", "websocket"]
+    checks: ["health", "auth", "courses", "progress", "teacher", "admin", "access-control", "content-crud", "chat", "assistant", "websocket"]
   }));
 }
 

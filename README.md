@@ -170,7 +170,16 @@ password123
 - `GET /api/me`
 - `GET /api/courses`
 - `GET /api/courses/:id`
+- `POST /api/courses`
+- `PUT /api/courses/:id`
+- `DELETE /api/courses/:id`
+- `POST /api/courses/:courseId/modules`
+- `PUT /api/modules/:id`
+- `DELETE /api/modules/:id`
+- `POST /api/modules/:moduleId/lessons`
 - `GET /api/lessons/:id`
+- `PUT /api/lessons/:id`
+- `DELETE /api/lessons/:id`
 - `POST /api/tests/:id/submit`
 - `GET /api/progress/me`
 - `GET /api/certificates/:code`
@@ -228,6 +237,7 @@ npm run preview
 
 - [QA Test Plan](docs/QA.md)
 - [Demo Script](docs/DEMO.md)
+- [Plan Status](docs/PLAN_STATUS.md)
 
 ## Logging
 

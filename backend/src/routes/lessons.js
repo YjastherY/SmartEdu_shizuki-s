@@ -3,6 +3,7 @@ import fs from "node:fs";
 import multer from "multer";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { z } from "zod";
 import { authRequired, teacherOrAdmin } from "../middleware/auth.js";
 import { prisma } from "../prisma.js";
 import { asyncHandler } from "../utils.js";
@@ -31,6 +32,38 @@ const videoUpload = multer({
     callback(null, true);
   }
 });
+
+const moduleSchema = z.object({
+  title: z.string().min(2),
+  order: z.number().int().min(1).optional()
+});
+
+const lessonSchema = z.object({
+  title: z.string().min(2),
+  type: z.enum(["VIDEO", "TEXT", "TEST"]).default("VIDEO"),
+  order: z.number().int().min(1).optional(),
+  duration: z.string().min(1).default("10 мин"),
+  content: z.string().optional().or(z.literal("")),
+  videoUrl: z.string().url().optional().or(z.literal(""))
+});
+
+async function nextModuleOrder(courseId) {
+  const last = await prisma.module.findFirst({
+    where: { courseId },
+    orderBy: { order: "desc" }
+  });
+
+  return (last?.order || 0) + 1;
+}
+
+async function nextLessonOrder(moduleId) {
+  const last = await prisma.lesson.findFirst({
+    where: { moduleId },
+    orderBy: { order: "desc" }
+  });
+
+  return (last?.order || 0) + 1;
+}
 
 async function refreshProgress(userId, courseId) {
   const totalLessons = await prisma.lesson.count({
@@ -61,6 +94,82 @@ async function refreshProgress(userId, courseId) {
     create: { userId, courseId, completedLessons, totalLessons, averageScore, percent }
   });
 }
+
+router.post(
+  "/courses/:courseId/modules",
+  authRequired,
+  teacherOrAdmin,
+  asyncHandler(async (req, res) => {
+    const data = moduleSchema.parse(req.body);
+    const course = await prisma.course.findUnique({ where: { id: req.params.courseId } });
+
+    if (!course) {
+      return res.status(404).json({ message: "Course not found" });
+    }
+
+    const module = await prisma.module.create({
+      data: {
+        title: data.title,
+        order: data.order || (await nextModuleOrder(course.id)),
+        courseId: course.id
+      },
+      include: { lessons: true }
+    });
+
+    res.status(201).json({ module });
+  })
+);
+
+router.put(
+  "/modules/:id",
+  authRequired,
+  teacherOrAdmin,
+  asyncHandler(async (req, res) => {
+    const data = moduleSchema.partial().parse(req.body);
+    const module = await prisma.module.update({
+      where: { id: req.params.id },
+      data
+    });
+
+    res.json({ module });
+  })
+);
+
+router.delete(
+  "/modules/:id",
+  authRequired,
+  teacherOrAdmin,
+  asyncHandler(async (req, res) => {
+    await prisma.module.delete({ where: { id: req.params.id } });
+    res.status(204).end();
+  })
+);
+
+router.post(
+  "/modules/:moduleId/lessons",
+  authRequired,
+  teacherOrAdmin,
+  asyncHandler(async (req, res) => {
+    const data = lessonSchema.parse(req.body);
+    const module = await prisma.module.findUnique({ where: { id: req.params.moduleId } });
+
+    if (!module) {
+      return res.status(404).json({ message: "Module not found" });
+    }
+
+    const lesson = await prisma.lesson.create({
+      data: {
+        ...data,
+        order: data.order || (await nextLessonOrder(module.id)),
+        content: data.content || null,
+        videoUrl: data.videoUrl || null,
+        moduleId: module.id
+      }
+    });
+
+    res.status(201).json({ lesson });
+  })
+);
 
 router.get(
   "/lessons/:id",
@@ -132,6 +241,35 @@ router.post(
 
     const progress = await refreshProgress(req.user.id, lesson.module.courseId);
     res.json({ progress });
+  })
+);
+
+router.put(
+  "/lessons/:id",
+  authRequired,
+  teacherOrAdmin,
+  asyncHandler(async (req, res) => {
+    const data = lessonSchema.partial().parse(req.body);
+    const lesson = await prisma.lesson.update({
+      where: { id: req.params.id },
+      data: {
+        ...data,
+        content: data.content === "" ? null : data.content,
+        videoUrl: data.videoUrl === "" ? null : data.videoUrl
+      }
+    });
+
+    res.json({ lesson });
+  })
+);
+
+router.delete(
+  "/lessons/:id",
+  authRequired,
+  teacherOrAdmin,
+  asyncHandler(async (req, res) => {
+    await prisma.lesson.delete({ where: { id: req.params.id } });
+    res.status(204).end();
   })
 );
 

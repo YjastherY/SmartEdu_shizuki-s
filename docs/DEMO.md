@@ -51,11 +51,12 @@ Use this script for the final SmartEdu presentation.
 
 1. Show the repository structure: `frontend`, `backend`, Docker Compose, README, QA docs.
 2. Show backend health endpoint: `/api/health`.
-3. Show CI workflow in `.github/workflows/ci.yml`.
-4. Show Docker deployment command.
-5. Run or show `npm run smoke` against the deployed Docker frontend.
-6. Show structured backend logs with request ids.
-7. Mention persisted uploads for avatars and videos through Docker volume.
+3. Show the plan status matrix in `docs/PLAN_STATUS.md`.
+4. Show CI workflow in `.github/workflows/ci.yml`.
+5. Show Docker deployment command.
+6. Run or show `npm run smoke` against the deployed Docker frontend.
+7. Show structured backend logs with request ids.
+8. Mention persisted uploads for avatars and videos through Docker volume.
 
 ## 6. Closing
 

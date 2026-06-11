@@ -41,6 +41,8 @@ This checklist covers the MVP flows required for SmartEdu acceptance testing.
 
 - Log in as `teacher@smartedu.local`.
 - Confirm `/teacher` is accessible for the teacher account.
+- Create, update, and delete a module through the content API.
+- Create, update, and delete a lesson through the content API.
 - Create a test with single-choice, multiple-choice, matching, and manual questions.
 - Try saving an incomplete test and confirm validation feedback is shown.
 - Upload a video file for a video lesson.
@@ -80,6 +82,7 @@ This checklist covers the MVP flows required for SmartEdu acceptance testing.
 - Confirm `docker compose -f docker-compose.server.yml ps` shows all services running.
 - Confirm `GET /api/health` returns `{"status":"ok","service":"smartedu-api"}`.
 - Run `SMARTEDU_BASE_URL=http://localhost:3000 npm run smoke` from `backend`.
+- Confirm smoke output includes `content-crud`, `assistant`, and `websocket`.
 - Log in through the deployed frontend.
 - Open one student, teacher, and admin page.
 - Check backend logs and confirm requests include JSON fields such as `requestId`, `method`, `url`, `status`, and `responseTimeMs`.
