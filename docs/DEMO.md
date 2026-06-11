@@ -4,7 +4,7 @@ Use this script for the final SmartEdu presentation.
 
 ## 1. Project Overview
 
-- SmartEdu is an educational platform for online courses, video lessons, tests, manual grading, progress tracking, live chat, notifications, and role-based dashboards.
+- SmartEdu is an educational platform for online courses, video lessons, tests, manual grading, progress tracking, live chat, learning assistant, notifications, and role-based dashboards.
 - The MVP uses React, TailwindCSS, Node.js, Express, Prisma, PostgreSQL, JWT, and Docker Compose.
 
 ## 2. Student Demo
@@ -19,10 +19,11 @@ Use this script for the final SmartEdu presentation.
 8. Submit a test and show progress update.
 9. Add a comment below a lesson.
 10. Open notifications and show unread counter clearing.
-11. Open chat, send a message, and show realtime delivery if a second session is open.
-12. Open profile, upload an avatar, and toggle dark mode.
-13. Open progress and show course statistics and the certificate section.
-14. If a certificate exists, open it in a new tab and show the verification code.
+11. Open the learning assistant and ask what to repeat before the React test.
+12. Open chat, send a message, and show realtime delivery if a second session is open.
+13. Open profile, upload an avatar, and toggle dark mode.
+14. Open progress and show course statistics and the certificate section.
+15. If a certificate exists, open it in a new tab and show the verification code.
 
 ## 3. Teacher Demo
 
@@ -58,5 +59,5 @@ Use this script for the final SmartEdu presentation.
 
 ## 6. Closing
 
-- Implemented core plan: auth, courses, lessons, tests, progress, certificates, comments, WebSocket notifications, live chat, dark mode, responsive UI, teacher/admin roles, Docker deploy, structured logs, CI, and QA documentation.
+- Implemented core plan: auth, courses, lessons, tests, progress, certificates, comments, WebSocket notifications, live chat, learning assistant, dark mode, responsive UI, teacher/admin roles, Docker deploy, structured logs, CI, and QA documentation.
 - Future improvements: production migrations, PDF certificates, API integration tests, HTTPS and domain setup.

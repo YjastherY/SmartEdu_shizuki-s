@@ -35,6 +35,7 @@ This checklist covers the MVP flows required for SmartEdu acceptance testing.
 - Open notifications, read them, and confirm unread counter clears.
 - Open the chat page, send a message, refresh the page, and confirm the message remains.
 - Open the app in two browser sessions and confirm a chat message appears without refreshing.
+- Open the learning assistant, ask a course question, and confirm the answer includes course sources.
 
 ## Teacher Flows
 

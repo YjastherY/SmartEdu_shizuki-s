@@ -108,12 +108,18 @@ async function main() {
   const chat = await authorized("/api/chat/messages", student.token);
   if (!Array.isArray(chat.messages)) throw new Error("Chat response must contain messages array");
 
+  const assistant = await authorized("/api/assistant/ask", student.token, {
+    method: "POST",
+    body: JSON.stringify({ question: "Что повторить по React перед тестом?" })
+  });
+  if (!assistant.answer || !Array.isArray(assistant.sources)) throw new Error("Assistant response is invalid");
+
   await verifyWebSocket(student.token);
 
   console.log(JSON.stringify({
     status: "ok",
     baseUrl,
-    checks: ["health", "auth", "courses", "progress", "teacher", "admin", "access-control", "chat", "websocket"]
+    checks: ["health", "auth", "courses", "progress", "teacher", "admin", "access-control", "chat", "assistant", "websocket"]
   }));
 }
 
