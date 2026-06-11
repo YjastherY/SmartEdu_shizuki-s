@@ -110,7 +110,7 @@ cp .env.server.example .env
 docker compose -f docker-compose.server.yml up -d --build
 ```
 
-For a remote server, set `CLIENT_URL` and `VITE_API_URL` in `.env` before building.
+The Docker frontend uses the same origin `/api` proxy by default, so it works from a remote IP without rebuilding for a specific address. Set `CLIENT_URL` in `.env` if the backend must restrict browser origins.
 
 Seed demo data after the containers start:
 
@@ -122,8 +122,8 @@ Default Docker URLs:
 
 ```text
 Frontend: http://localhost:3000
-Backend API: http://localhost:4000/api
-Health check: http://localhost:4000/api/health
+Backend API: http://localhost:3000/api
+Health check: http://localhost:3000/api/health
 ```
 
 Useful commands:

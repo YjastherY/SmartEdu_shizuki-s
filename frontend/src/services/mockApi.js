@@ -351,6 +351,15 @@ function saveState(state) {
   localStorage.setItem("smartedu_mock_state", JSON.stringify(state));
 }
 
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("Не удалось прочитать файл"));
+    reader.readAsDataURL(file);
+  });
+}
+
 function hydrateProgress(state) {
   return {
     ...state,
@@ -634,9 +643,10 @@ export async function mockApi(path, options = {}) {
   }
   if (path === "/users/avatar") {
     const file = body.avatar;
+    const avatarUrl = file instanceof File ? await fileToDataUrl(file) : state.user.avatarUrl;
     state.user = {
       ...state.user,
-      avatarUrl: file instanceof File ? URL.createObjectURL(file) : state.user.avatarUrl
+      avatarUrl
     };
     saveState(state);
     return { user: state.user, avatarUrl: state.user.avatarUrl };
