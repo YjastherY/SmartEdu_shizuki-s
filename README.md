@@ -199,8 +199,8 @@ npm run preview
 ## Roadmap
 
 - Replace `prisma db push` in Docker with production migrations
-- Add file uploads for avatars and video materials
+- Add file uploads for video materials
 - Add generated PDF certificates
 - Add WebSocket notifications and live student chat
-- Add CI checks for frontend build, backend linting, and API tests
+- Add API integration tests
 - Add HTTPS, domain configuration, and production secrets management

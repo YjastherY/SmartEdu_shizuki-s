@@ -31,8 +31,22 @@ export default function App() {
         <Route path="/lessons/:lessonId" element={<Lesson />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/progress" element={<Progress />} />
-        <Route path="/teacher" element={<TeacherPanel />} />
-        <Route path="/admin" element={<AdminPanel />} />
+        <Route
+          path="/teacher"
+          element={
+            <ProtectedRoute roles={["TEACHER", "ADMIN"]}>
+              <TeacherPanel />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute roles={["ADMIN"]}>
+              <AdminPanel />
+            </ProtectedRoute>
+          }
+        />
       </Route>
     </Routes>
   );
