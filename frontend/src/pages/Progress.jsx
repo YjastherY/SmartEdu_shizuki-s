@@ -1,7 +1,7 @@
-import { Award, ClipboardCheck } from "lucide-react";
+import { Award, ClipboardCheck, ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
 import ProgressChart from "../components/ProgressChart.jsx";
-import { api } from "../services/api.js";
+import { api, assetUrl } from "../services/api.js";
 
 export default function Progress() {
   const [data, setData] = useState({ progress: [], certificates: [], attempts: [] });
@@ -60,6 +60,14 @@ export default function Progress() {
                 <div key={item.id} className="rounded-lg bg-amber-50 p-4 text-amber-900 dark:bg-amber-950 dark:text-amber-100">
                   <p className="font-bold">{item.course.title}</p>
                   <p className="text-sm">Код: {item.code}</p>
+                  <a
+                    className="mt-3 inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-amber-800 transition hover:-translate-y-0.5 dark:bg-white/10 dark:text-amber-100"
+                    href={assetUrl(`/api/certificates/${encodeURIComponent(item.code)}`)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Открыть сертификат <ExternalLink size={15} />
+                  </a>
                 </div>
               ))}
             </div>

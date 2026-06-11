@@ -20,7 +20,7 @@ SmartEdu is an MVP educational platform for online courses, video lessons, tests
 - Tests with attempts, time limit, deadline, best-score logic, and weighted questions
 - Question types: single choice, multiple choice, matching, manual answer
 - Manual grading for open-answer tasks with teacher feedback
-- Student progress, course statistics, and certificates foundation
+- Student progress, course statistics, and viewable certificates
 - Lesson comments
 - Notifications for students and teachers
 - Student profile and dark mode
@@ -164,6 +164,7 @@ password123
 - `GET /api/lessons/:id`
 - `POST /api/tests/:id/submit`
 - `GET /api/progress/me`
+- `GET /api/certificates/:code`
 - `POST /api/comments`
 - `GET /api/notifications`
 - `PATCH /api/users/settings`

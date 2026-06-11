@@ -20,7 +20,8 @@ Use this script for the final SmartEdu presentation.
 9. Add a comment below a lesson.
 10. Open notifications and show unread counter clearing.
 11. Open profile, upload an avatar, and toggle dark mode.
-12. Open progress and show course statistics and certificates section.
+12. Open progress and show course statistics and the certificate section.
+13. If a certificate exists, open it in a new tab and show the verification code.
 
 ## 3. Teacher Demo
 
@@ -54,5 +55,5 @@ Use this script for the final SmartEdu presentation.
 
 ## 6. Closing
 
-- Implemented core plan: auth, courses, lessons, tests, progress, comments, notifications, dark mode, responsive UI, teacher/admin roles, Docker deploy, CI, and QA documentation.
+- Implemented core plan: auth, courses, lessons, tests, progress, certificates, comments, notifications, dark mode, responsive UI, teacher/admin roles, Docker deploy, CI, and QA documentation.
 - Future improvements: production migrations, PDF certificates, live chat/WebSocket notifications, API integration tests, HTTPS and domain setup.

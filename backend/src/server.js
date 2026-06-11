@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { ZodError } from "zod";
 import adminRoutes from "./routes/admin.js";
 import authRoutes from "./routes/auth.js";
+import certificateRoutes from "./routes/certificates.js";
 import commentRoutes from "./routes/comments.js";
 import courseRoutes from "./routes/courses.js";
 import lessonRoutes from "./routes/lessons.js";
@@ -46,6 +47,7 @@ app.use("/api", testRoutes);
 app.use("/api", progressRoutes);
 app.use("/api", commentRoutes);
 app.use("/api", notificationRoutes);
+app.use("/api", certificateRoutes);
 app.use("/api", teacherRoutes);
 app.use("/api", adminRoutes);
 

@@ -29,6 +29,7 @@ This checklist covers the MVP flows required for SmartEdu acceptance testing.
 - Submit a test with a manual-answer question and confirm it enters review state.
 - Add a lesson comment and confirm it appears in the comments list.
 - Open progress page and confirm courses, scores, and certificates section render.
+- If a certificate exists, open it and confirm student name, course, issue date, and code render.
 - Upload an avatar file and confirm it remains after page refresh.
 - Toggle dark mode and confirm the setting remains after refresh.
 - Open notifications, read them, and confirm unread counter clears.
