@@ -61,7 +61,7 @@ app.use((error, req, res, next) => {
     });
   }
 
-  if (error.message === "Only image files are allowed" || error.code === "LIMIT_FILE_SIZE") {
+  if (["Only image files are allowed", "Only video files are allowed"].includes(error.message) || error.code === "LIMIT_FILE_SIZE") {
     return res.status(400).json({
       message: error.code === "LIMIT_FILE_SIZE" ? "File is too large" : error.message
     });

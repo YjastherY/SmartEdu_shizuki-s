@@ -133,6 +133,12 @@ router.get(
     const courseFilter = await teacherCourseFilter(req.user);
     const courses = await prisma.course.findMany({
       where: courseFilter,
+      include: {
+        modules: {
+          orderBy: { order: "asc" },
+          include: { lessons: { orderBy: { order: "asc" } } }
+        }
+      },
       orderBy: { createdAt: "desc" }
     });
     const groups = await prisma.group.findMany({

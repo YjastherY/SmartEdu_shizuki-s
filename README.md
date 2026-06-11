@@ -16,7 +16,7 @@ SmartEdu is an MVP educational platform for online courses, video lessons, tests
 - Protected routes and JWT authorization
 - Course catalog with search and filtering
 - Course pages with modules and lessons
-- Video lessons and test lessons
+- Video lessons, uploaded video materials, and test lessons
 - Tests with attempts, time limit, deadline, best-score logic, and weighted questions
 - Question types: single choice, multiple choice, matching, manual answer
 - Manual grading for open-answer tasks with teacher feedback
@@ -24,7 +24,7 @@ SmartEdu is an MVP educational platform for online courses, video lessons, tests
 - Lesson comments
 - Notifications for students and teachers
 - Student profile and dark mode
-- Avatar upload with static file serving
+- Avatar and lesson video uploads with static file serving
 - Teacher dashboard for test creation, grading, groups, and student progress
 - Admin dashboard for roles, groups, and teacher assignment
 - Docker-based local/server setup
@@ -168,6 +168,7 @@ password123
 - `GET /api/notifications`
 - `PATCH /api/users/settings`
 - `POST /api/users/avatar`
+- `PATCH /api/lessons/:id/video`
 - `GET /api/teacher/overview`
 - `POST /api/teacher/tests`
 - `PATCH /api/teacher/submissions/:id/grade`
@@ -199,7 +200,6 @@ npm run preview
 ## Roadmap
 
 - Replace `prisma db push` in Docker with production migrations
-- Add file uploads for video materials
 - Add generated PDF certificates
 - Add WebSocket notifications and live student chat
 - Add API integration tests

@@ -1,7 +1,9 @@
+import { assetUrl } from "../services/api.js";
+
 export default function LessonPlayer({ lesson }) {
   if (lesson.videoUrl) {
     return (
-      <video className="aspect-video w-full rounded-lg bg-black" controls src={lesson.videoUrl}>
+      <video className="aspect-video w-full rounded-lg bg-black" controls src={assetUrl(lesson.videoUrl)}>
         Ваш браузер не поддерживает видео.
       </video>
     );

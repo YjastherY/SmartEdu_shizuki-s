@@ -1,9 +1,36 @@
 import { Router } from "express";
-import { authRequired } from "../middleware/auth.js";
+import fs from "node:fs";
+import multer from "multer";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { authRequired, teacherOrAdmin } from "../middleware/auth.js";
 import { prisma } from "../prisma.js";
 import { asyncHandler } from "../utils.js";
 
 const router = Router();
+const videoUploadRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../uploads/videos");
+
+fs.mkdirSync(videoUploadRoot, { recursive: true });
+
+const videoStorage = multer.diskStorage({
+  destination: videoUploadRoot,
+  filename: (req, file, callback) => {
+    const extension = path.extname(file.originalname).toLowerCase() || ".mp4";
+    callback(null, `${req.params.id}-${Date.now()}${extension}`);
+  }
+});
+
+const videoUpload = multer({
+  storage: videoStorage,
+  limits: { fileSize: 200 * 1024 * 1024 },
+  fileFilter: (req, file, callback) => {
+    if (!["video/mp4", "video/webm", "video/ogg", "video/quicktime"].includes(file.mimetype)) {
+      return callback(new Error("Only video files are allowed"));
+    }
+
+    callback(null, true);
+  }
+});
 
 async function refreshProgress(userId, courseId) {
   const totalLessons = await prisma.lesson.count({
@@ -105,6 +132,28 @@ router.post(
 
     const progress = await refreshProgress(req.user.id, lesson.module.courseId);
     res.json({ progress });
+  })
+);
+
+router.patch(
+  "/lessons/:id/video",
+  authRequired,
+  teacherOrAdmin,
+  videoUpload.single("video"),
+  asyncHandler(async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ message: "Video file is required" });
+    }
+
+    const lesson = await prisma.lesson.update({
+      where: { id: req.params.id },
+      data: {
+        type: "VIDEO",
+        videoUrl: `/uploads/videos/${req.file.filename}`
+      }
+    });
+
+    res.json({ lesson, videoUrl: lesson.videoUrl });
   })
 );
 

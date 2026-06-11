@@ -1,9 +1,10 @@
-import { BookOpen, CheckCircle2, ClipboardCheck, Plus, Trash2, UsersRound } from "lucide-react";
+import { BookOpen, CheckCircle2, ClipboardCheck, Plus, Trash2, Upload, UsersRound } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { api } from "../services/api.js";
+import { api, assetUrl } from "../services/api.js";
 
 const tabs = [
   { id: "create", label: "Создание теста" },
+  { id: "video", label: "Видео" },
   { id: "review", label: "Проверка" },
   { id: "progress", label: "Успеваемость" }
 ];
@@ -34,6 +35,7 @@ export default function TeacherPanel() {
   const [grade, setGrade] = useState({});
   const [saved, setSaved] = useState("");
   const [savingTest, setSavingTest] = useState(false);
+  const [videoState, setVideoState] = useState({ lessonId: "", file: null, message: "", uploading: false });
 
   useEffect(() => {
     api("/teacher/overview").then((result) => {
@@ -48,6 +50,17 @@ export default function TeacherPanel() {
   const selectedGroup = data?.groups.find((group) => group.id === selectedGroupId);
   const selectedStudent = selectedGroup?.students.find((student) => student.id === selectedStudentId);
   const pending = data?.manualSubmissions.filter((item) => item.status === "PENDING") || [];
+  const videoLessons = useMemo(
+    () =>
+      courses.flatMap((course) =>
+        (course.modules || []).flatMap((module) =>
+          (module.lessons || [])
+            .filter((lesson) => lesson.type === "VIDEO")
+            .map((lesson) => ({ ...lesson, courseTitle: course.title, moduleTitle: module.title }))
+        )
+      ),
+    [courses]
+  );
   const totalPoints = useMemo(() => draft.questions.reduce((sum, item) => sum + Number(item.maxScore || 0), 0), [draft.questions]);
   const questionSummary = useMemo(() => `${draft.questions.length} заданий • ${totalPoints} баллов`, [draft.questions.length, totalPoints]);
 
@@ -99,6 +112,34 @@ export default function TeacherPanel() {
     setData(await api("/teacher/overview"));
   }
 
+  async function uploadLessonVideo(event) {
+    event.preventDefault();
+    setVideoState((value) => ({ ...value, message: "" }));
+
+    if (!videoState.lessonId) {
+      setVideoState((value) => ({ ...value, message: "Выберите урок" }));
+      return;
+    }
+
+    if (!videoState.file) {
+      setVideoState((value) => ({ ...value, message: "Выберите видеофайл" }));
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("video", videoState.file);
+    setVideoState((value) => ({ ...value, uploading: true }));
+
+    try {
+      await api(`/lessons/${videoState.lessonId}/video`, { method: "PATCH", body: formData });
+      const refreshed = await api("/teacher/overview");
+      setData(refreshed);
+      setVideoState({ lessonId: videoState.lessonId, file: null, message: "Видео загружено", uploading: false });
+    } catch (error) {
+      setVideoState((value) => ({ ...value, message: error.message || "Не удалось загрузить видео", uploading: false }));
+    }
+  }
+
   function updateQuestion(index, patch) {
     setDraft((value) => ({
       ...value,
@@ -142,6 +183,15 @@ export default function TeacherPanel() {
           setDraft={setDraft}
           saveTest={saveTest}
           updateQuestion={updateQuestion}
+        />
+      )}
+
+      {activeTab === "video" && (
+        <VideoTab
+          lessons={videoLessons}
+          videoState={videoState}
+          setVideoState={setVideoState}
+          uploadLessonVideo={uploadLessonVideo}
         />
       )}
 
@@ -273,6 +323,92 @@ function TestEditor({ courses, draft, saved, savingTest, questionSummary, setDra
       </div>
       {saved && <p className={`text-sm font-semibold ${saved === "Тест сохранен" ? "text-emerald-600" : "text-red-600"}`}>{saved}</p>}
     </form>
+  );
+}
+
+function VideoTab({ lessons, videoState, setVideoState, uploadLessonVideo }) {
+  const selectedLesson = lessons.find((lesson) => lesson.id === videoState.lessonId) || lessons[0];
+
+  useEffect(() => {
+    if (!videoState.lessonId && lessons[0]) {
+      setVideoState((value) => ({ ...value, lessonId: lessons[0].id }));
+    }
+  }, [lessons, setVideoState, videoState.lessonId]);
+
+  return (
+    <section className="grid gap-6 xl:grid-cols-[360px_1fr]">
+      <form className="panel space-y-4" onSubmit={uploadLessonVideo}>
+        <div>
+          <p className="text-sm font-semibold text-brand-600">Материалы уроков</p>
+          <h2 className="text-xl font-bold">Загрузка видео</h2>
+        </div>
+        <label className="text-sm font-medium">
+          Урок
+          <select
+            className="input mt-1"
+            value={videoState.lessonId}
+            onChange={(event) => setVideoState((value) => ({ ...value, lessonId: event.target.value, message: "" }))}
+          >
+            {lessons.map((lesson) => (
+              <option key={lesson.id} value={lesson.id}>
+                {lesson.courseTitle} / {lesson.title}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-sm font-medium">
+          Видеофайл
+          <input
+            className="input mt-1"
+            type="file"
+            accept="video/mp4,video/webm,video/ogg,video/quicktime"
+            onChange={(event) => setVideoState((value) => ({ ...value, file: event.target.files?.[0] || null, message: "" }))}
+          />
+        </label>
+        <button className="btn-primary flex items-center gap-2" disabled={videoState.uploading || lessons.length === 0}>
+          <Upload size={16} />
+          {videoState.uploading ? "Загружаем..." : "Загрузить видео"}
+        </button>
+        {videoState.message && (
+          <p className={`text-sm font-semibold ${videoState.message === "Видео загружено" ? "text-emerald-600" : "text-red-600"}`}>
+            {videoState.message}
+          </p>
+        )}
+      </form>
+
+      <div className="panel space-y-4">
+        <h2 className="text-xl font-bold">Видео-уроки</h2>
+        <div className="grid gap-3">
+          {lessons.map((lesson) => (
+            <button
+              key={lesson.id}
+              className={`rounded-lg border p-4 text-left transition hover:-translate-y-0.5 ${
+                selectedLesson?.id === lesson.id
+                  ? "border-brand-500 bg-brand-50 dark:bg-brand-950"
+                  : "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800"
+              }`}
+              onClick={() => setVideoState((value) => ({ ...value, lessonId: lesson.id, message: "" }))}
+            >
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="font-semibold">{lesson.title}</p>
+                  <p className="text-sm text-slate-500">{lesson.courseTitle} / {lesson.moduleTitle}</p>
+                </div>
+                <span className={`w-fit rounded-full px-2 py-1 text-xs font-semibold ${lesson.videoUrl ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-100" : "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-200"}`}>
+                  {lesson.videoUrl ? "Видео есть" : "Нет видео"}
+                </span>
+              </div>
+              {lesson.videoUrl && (
+                <a className="mt-3 inline-flex text-sm font-semibold text-brand-600" href={assetUrl(lesson.videoUrl)} target="_blank" rel="noreferrer">
+                  Открыть файл
+                </a>
+              )}
+            </button>
+          ))}
+          {lessons.length === 0 && <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-800">Видео-уроков пока нет.</p>}
+        </div>
+      </div>
+    </section>
   );
 }
 
