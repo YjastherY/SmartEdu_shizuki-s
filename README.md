@@ -197,6 +197,11 @@ npm run build
 npm run preview
 ```
 
+## QA and Demo
+
+- [QA Test Plan](docs/QA.md)
+- [Demo Script](docs/DEMO.md)
+
 ## Roadmap
 
 - Replace `prisma db push` in Docker with production migrations
