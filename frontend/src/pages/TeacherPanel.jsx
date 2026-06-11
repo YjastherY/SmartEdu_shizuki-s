@@ -4,7 +4,7 @@ import { api, assetUrl } from "../services/api.js";
 
 const tabs = [
   { id: "create", label: "Создание теста" },
-  { id: "video", label: "Видео" },
+  { id: "materials", label: "Материалы" },
   { id: "review", label: "Проверка" },
   { id: "progress", label: "Успеваемость" }
 ];
@@ -29,6 +29,8 @@ export default function TeacherPanel() {
     attemptLimit: 2,
     timeLimitMinutes: 20,
     deadline: "2026-12-31",
+    isPublished: true,
+    visibleFrom: "",
     courseId: "",
     questions: [{ ...emptyQuestion }]
   });
@@ -36,6 +38,18 @@ export default function TeacherPanel() {
   const [saved, setSaved] = useState("");
   const [savingTest, setSavingTest] = useState(false);
   const [videoState, setVideoState] = useState({ lessonId: "", file: null, message: "", uploading: false });
+  const [activityDraft, setActivityDraft] = useState({
+    moduleId: "",
+    title: "",
+    type: "TEXT",
+    duration: "10 мин",
+    content: "",
+    videoUrl: "",
+    imageUrl: "",
+    isPublished: true,
+    visibleFrom: ""
+  });
+  const [activityMessage, setActivityMessage] = useState("");
 
   useEffect(() => {
     api("/teacher/overview").then((result) => {
@@ -43,6 +57,7 @@ export default function TeacherPanel() {
       setSelectedGroupId(result.groups[0]?.id || "");
       setSelectedStudentId(result.groups[0]?.students[0]?.id || "");
       setDraft((value) => ({ ...value, courseId: value.courseId || result.courses[0]?.id || "" }));
+      setActivityDraft((value) => ({ ...value, moduleId: value.moduleId || result.courses[0]?.modules?.[0]?.id || "" }));
     });
   }, []);
 
@@ -61,8 +76,27 @@ export default function TeacherPanel() {
       ),
     [courses]
   );
+  const materialLessons = useMemo(
+    () =>
+      courses.flatMap((course) =>
+        (course.modules || []).flatMap((module) =>
+          (module.lessons || []).map((lesson) => ({ ...lesson, courseTitle: course.title, moduleTitle: module.title }))
+        )
+      ),
+    [courses]
+  );
   const totalPoints = useMemo(() => draft.questions.reduce((sum, item) => sum + Number(item.maxScore || 0), 0), [draft.questions]);
   const questionSummary = useMemo(() => `${draft.questions.length} заданий • ${totalPoints} баллов`, [draft.questions.length, totalPoints]);
+  const modules = useMemo(
+    () =>
+      courses.flatMap((course) =>
+        (course.modules || []).map((module) => ({
+          ...module,
+          courseTitle: course.title
+        }))
+      ),
+    [courses]
+  );
 
   if (!data) return <div className="panel text-sm text-slate-500">Загружаем кабинет преподавателя...</div>;
 
@@ -140,6 +174,45 @@ export default function TeacherPanel() {
     }
   }
 
+  async function saveActivity(event) {
+    event.preventDefault();
+    setActivityMessage("");
+
+    if (!activityDraft.moduleId) {
+      setActivityMessage("Выберите модуль");
+      return;
+    }
+
+    try {
+      await api(`/modules/${activityDraft.moduleId}/lessons`, {
+        method: "POST",
+        body: JSON.stringify({
+          title: activityDraft.title,
+          type: activityDraft.type,
+          duration: activityDraft.duration,
+          content: activityDraft.content,
+          videoUrl: activityDraft.videoUrl,
+          imageUrl: activityDraft.imageUrl,
+          isPublished: activityDraft.isPublished,
+          visibleFrom: activityDraft.visibleFrom
+        })
+      });
+      const refreshed = await api("/teacher/overview");
+      setData(refreshed);
+      setActivityDraft((value) => ({
+        ...value,
+        title: "",
+        content: "",
+        videoUrl: "",
+        imageUrl: "",
+        visibleFrom: ""
+      }));
+      setActivityMessage("Материал создан");
+    } catch (error) {
+      setActivityMessage(error.message || "Не удалось создать материал");
+    }
+  }
+
   function updateQuestion(index, patch) {
     setDraft((value) => ({
       ...value,
@@ -186,12 +259,19 @@ export default function TeacherPanel() {
         />
       )}
 
-      {activeTab === "video" && (
-        <VideoTab
-          lessons={videoLessons}
+      {activeTab === "materials" && (
+        <MaterialsTab
+          modules={modules}
+          lessons={materialLessons}
+          videoLessons={videoLessons}
           videoState={videoState}
           setVideoState={setVideoState}
           uploadLessonVideo={uploadLessonVideo}
+          activityDraft={activityDraft}
+          setActivityDraft={setActivityDraft}
+          activityMessage={activityMessage}
+          saveActivity={saveActivity}
+          refreshTeacherData={async () => setData(await api("/teacher/overview"))}
         />
       )}
 
@@ -301,6 +381,14 @@ function TestEditor({ courses, draft, saved, savingTest, questionSummary, setDra
           Дедлайн
           <input className="input mt-1" type="date" value={draft.deadline} onChange={(event) => setDraft({ ...draft, deadline: event.target.value })} />
         </label>
+        <label className="text-sm font-medium">
+          Показать с даты
+          <input className="input mt-1" type="datetime-local" value={draft.visibleFrom} onChange={(event) => setDraft({ ...draft, visibleFrom: event.target.value })} />
+        </label>
+        <label className="flex items-center gap-2 rounded-lg border border-slate-200 p-3 text-sm font-medium dark:border-slate-700">
+          <input type="checkbox" checked={draft.isPublished} onChange={(event) => setDraft({ ...draft, isPublished: event.target.checked })} />
+          Видно студентам
+        </label>
       </div>
 
       <div className="space-y-4">
@@ -326,18 +414,78 @@ function TestEditor({ courses, draft, saved, savingTest, questionSummary, setDra
   );
 }
 
-function VideoTab({ lessons, videoState, setVideoState, uploadLessonVideo }) {
-  const selectedLesson = lessons.find((lesson) => lesson.id === videoState.lessonId) || lessons[0];
+function MaterialsTab({ modules, lessons, videoLessons, videoState, setVideoState, uploadLessonVideo, activityDraft, setActivityDraft, activityMessage, saveActivity, refreshTeacherData }) {
+  const selectedLesson = videoLessons.find((lesson) => lesson.id === videoState.lessonId) || videoLessons[0];
+  const [visibilityDates, setVisibilityDates] = useState({});
 
   useEffect(() => {
-    if (!videoState.lessonId && lessons[0]) {
-      setVideoState((value) => ({ ...value, lessonId: lessons[0].id }));
+    if (!videoState.lessonId && videoLessons[0]) {
+      setVideoState((value) => ({ ...value, lessonId: videoLessons[0].id }));
     }
-  }, [lessons, setVideoState, videoState.lessonId]);
+  }, [videoLessons, setVideoState, videoState.lessonId]);
+
+  async function updateVisibility(lesson, patch) {
+    await api(`/lessons/${lesson.id}`, { method: "PUT", body: JSON.stringify(patch) });
+    await refreshTeacherData();
+  }
 
   return (
-    <section className="grid gap-6 xl:grid-cols-[360px_1fr]">
-      <form className="panel space-y-4" onSubmit={uploadLessonVideo}>
+    <section className="grid gap-6 xl:grid-cols-[380px_1fr]">
+      <div className="space-y-6">
+        <form className="panel space-y-4" onSubmit={saveActivity}>
+          <div>
+            <p className="text-sm font-semibold text-brand-600">Учебные активности</p>
+            <h2 className="text-xl font-bold">Новый материал</h2>
+          </div>
+          <label className="text-sm font-medium">
+            Модуль
+            <select className="input mt-1" value={activityDraft.moduleId} onChange={(event) => setActivityDraft({ ...activityDraft, moduleId: event.target.value })}>
+              <option value="" disabled>Выберите модуль</option>
+              {modules.map((module) => (
+                <option key={module.id} value={module.id}>{module.courseTitle} / {module.title}</option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm font-medium">
+            Тип
+            <select className="input mt-1" value={activityDraft.type} onChange={(event) => setActivityDraft({ ...activityDraft, type: event.target.value })}>
+              <option value="TEXT">Текстовый материал</option>
+              <option value="VIDEO">Видео-материал</option>
+            </select>
+          </label>
+          <label className="text-sm font-medium">
+            Название
+            <input className="input mt-1" value={activityDraft.title} onChange={(event) => setActivityDraft({ ...activityDraft, title: event.target.value })} required />
+          </label>
+          <label className="text-sm font-medium">
+            Длительность
+            <input className="input mt-1" value={activityDraft.duration} onChange={(event) => setActivityDraft({ ...activityDraft, duration: event.target.value })} required />
+          </label>
+          <label className="text-sm font-medium">
+            Ссылка на видео
+            <input className="input mt-1" type="url" value={activityDraft.videoUrl} onChange={(event) => setActivityDraft({ ...activityDraft, videoUrl: event.target.value })} placeholder="https://..." />
+          </label>
+          <label className="text-sm font-medium">
+            Фото к материалу
+            <input className="input mt-1" type="url" value={activityDraft.imageUrl} onChange={(event) => setActivityDraft({ ...activityDraft, imageUrl: event.target.value })} placeholder="https://..." />
+          </label>
+          <label className="text-sm font-medium">
+            Показать с даты
+            <input className="input mt-1" type="datetime-local" value={activityDraft.visibleFrom} onChange={(event) => setActivityDraft({ ...activityDraft, visibleFrom: event.target.value })} />
+          </label>
+          <label className="flex items-center gap-2 rounded-lg border border-slate-200 p-3 text-sm font-medium dark:border-slate-700">
+            <input type="checkbox" checked={activityDraft.isPublished} onChange={(event) => setActivityDraft({ ...activityDraft, isPublished: event.target.checked })} />
+            Видно студентам
+          </label>
+          <label className="text-sm font-medium">
+            Материал
+            <textarea className="input mt-1 min-h-28" value={activityDraft.content} onChange={(event) => setActivityDraft({ ...activityDraft, content: event.target.value })} />
+          </label>
+          <button className="btn-primary">Создать материал</button>
+          {activityMessage && <p className={`text-sm font-semibold ${activityMessage === "Материал создан" ? "text-emerald-600" : "text-red-600"}`}>{activityMessage}</p>}
+        </form>
+
+        <form className="panel space-y-4" onSubmit={uploadLessonVideo}>
         <div>
           <p className="text-sm font-semibold text-brand-600">Материалы уроков</p>
           <h2 className="text-xl font-bold">Загрузка видео</h2>
@@ -349,7 +497,7 @@ function VideoTab({ lessons, videoState, setVideoState, uploadLessonVideo }) {
             value={videoState.lessonId}
             onChange={(event) => setVideoState((value) => ({ ...value, lessonId: event.target.value, message: "" }))}
           >
-            {lessons.map((lesson) => (
+            {videoLessons.map((lesson) => (
               <option key={lesson.id} value={lesson.id}>
                 {lesson.courseTitle} / {lesson.title}
               </option>
@@ -365,7 +513,7 @@ function VideoTab({ lessons, videoState, setVideoState, uploadLessonVideo }) {
             onChange={(event) => setVideoState((value) => ({ ...value, file: event.target.files?.[0] || null, message: "" }))}
           />
         </label>
-        <button className="btn-primary flex items-center gap-2" disabled={videoState.uploading || lessons.length === 0}>
+        <button className="btn-primary flex items-center gap-2" disabled={videoState.uploading || videoLessons.length === 0}>
           <Upload size={16} />
           {videoState.uploading ? "Загружаем..." : "Загрузить видео"}
         </button>
@@ -374,42 +522,97 @@ function VideoTab({ lessons, videoState, setVideoState, uploadLessonVideo }) {
             {videoState.message}
           </p>
         )}
-      </form>
+        </form>
+      </div>
 
       <div className="panel space-y-4">
-        <h2 className="text-xl font-bold">Видео-уроки</h2>
+        <h2 className="text-xl font-bold">Материалы курса</h2>
         <div className="grid gap-3">
           {lessons.map((lesson) => (
-            <button
+            <div
               key={lesson.id}
               className={`rounded-lg border p-4 text-left transition hover:-translate-y-0.5 ${
                 selectedLesson?.id === lesson.id
                   ? "border-brand-500 bg-brand-50 dark:bg-brand-950"
                   : "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800"
               }`}
-              onClick={() => setVideoState((value) => ({ ...value, lessonId: lesson.id, message: "" }))}
             >
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="font-semibold">{lesson.title}</p>
                   <p className="text-sm text-slate-500">{lesson.courseTitle} / {lesson.moduleTitle}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-300">{lessonTypeLabel(lesson.type)}</p>
                 </div>
-                <span className={`w-fit rounded-full px-2 py-1 text-xs font-semibold ${lesson.videoUrl ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-100" : "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-200"}`}>
-                  {lesson.videoUrl ? "Видео есть" : "Нет видео"}
-                </span>
+                <div className="flex flex-wrap gap-2">
+                  {lesson.type === "VIDEO" && (
+                    <span className={`w-fit rounded-full px-2 py-1 text-xs font-semibold ${lesson.videoUrl ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-100" : "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-200"}`}>
+                      {lesson.videoUrl ? "Видео есть" : "Нет видео"}
+                    </span>
+                  )}
+                  <VisibilityBadge item={lesson} />
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {lesson.type === "VIDEO" && (
+                  <button className="btn-secondary px-3 py-1" onClick={() => setVideoState((value) => ({ ...value, lessonId: lesson.id, message: "" }))}>
+                    Выбрать для видео
+                  </button>
+                )}
+                <button className="btn-secondary px-3 py-1" onClick={() => updateVisibility(lesson, { isPublished: !lesson.isPublished })}>
+                  {lesson.isPublished ? "Скрыть" : "Показать"}
+                </button>
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
+                <input
+                  className="input"
+                  type="datetime-local"
+                  value={visibilityDates[lesson.id] ?? formatDateTimeLocal(lesson.visibleFrom)}
+                  onChange={(event) => setVisibilityDates((value) => ({ ...value, [lesson.id]: event.target.value }))}
+                />
+                <button className="btn-secondary" onClick={() => updateVisibility(lesson, { visibleFrom: visibilityDates[lesson.id] ?? formatDateTimeLocal(lesson.visibleFrom) })}>
+                  Запланировать
+                </button>
               </div>
               {lesson.videoUrl && (
                 <a className="mt-3 inline-flex text-sm font-semibold text-brand-600" href={assetUrl(lesson.videoUrl)} target="_blank" rel="noreferrer">
                   Открыть файл
                 </a>
               )}
-            </button>
+            </div>
           ))}
-          {lessons.length === 0 && <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-800">Видео-уроков пока нет.</p>}
+          {lessons.length === 0 && <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-800">Материалов пока нет.</p>}
         </div>
       </div>
     </section>
   );
+}
+
+function lessonTypeLabel(type) {
+  const labels = {
+    VIDEO: "Видео-материал",
+    TEXT: "Текстовый материал",
+    TEST: "Тест"
+  };
+  return labels[type] || "Материал";
+}
+
+function formatDateTimeLocal(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
+
+function VisibilityBadge({ item }) {
+  const scheduled = item.visibleFrom && new Date(item.visibleFrom) > new Date();
+  const label = !item.isPublished ? "Скрыто" : scheduled ? "Запланировано" : "Видно";
+  const className = !item.isPublished
+    ? "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-200"
+    : scheduled
+      ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-100"
+      : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-100";
+
+  return <span className={`w-fit rounded-full px-2 py-1 text-xs font-semibold ${className}`}>{label}</span>;
 }
 
 function ReviewTab({ submissions, pending, grade, setGrade, gradeSubmission }) {

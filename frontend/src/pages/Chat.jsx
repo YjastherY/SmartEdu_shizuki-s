@@ -5,13 +5,22 @@ import { api, assetUrl, realtimeUrl } from "../services/api.js";
 
 export default function Chat() {
   const { user } = useAuth();
+  const [groups, setGroups] = useState([]);
+  const [selectedGroupId, setSelectedGroupId] = useState("");
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [connected, setConnected] = useState(false);
   const socketRef = useRef(null);
+  const selectedGroupRef = useRef("");
+  const messagesRef = useRef(null);
 
   useEffect(() => {
-    api("/chat/messages").then((data) => setMessages(data.messages)).catch(() => {});
+    api("/chat/groups")
+      .then((data) => {
+        setGroups(data.groups || []);
+        setSelectedGroupId((current) => current || data.groups?.[0]?.id || "");
+      })
+      .catch(() => {});
 
     const url = realtimeUrl();
     if (!url) return undefined;
@@ -23,7 +32,7 @@ export default function Chat() {
     socket.onerror = () => setConnected(false);
     socket.onmessage = (event) => {
       const payload = JSON.parse(event.data);
-      if (payload.type === "chat_message") {
+      if (payload.type === "chat_message" && payload.message.groupId === selectedGroupRef.current) {
         setMessages((items) => [...items.filter((item) => item.id !== payload.message.id), payload.message].slice(-50));
       }
     };
@@ -31,21 +40,39 @@ export default function Chat() {
     return () => socket.close();
   }, []);
 
+  useEffect(() => {
+    selectedGroupRef.current = selectedGroupId;
+    if (!selectedGroupId) {
+      setMessages([]);
+      return;
+    }
+
+    api(`/chat/messages?groupId=${encodeURIComponent(selectedGroupId)}`)
+      .then((data) => setMessages(data.messages || []))
+      .catch(() => setMessages([]));
+  }, [selectedGroupId]);
+
+  useEffect(() => {
+    messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages]);
+
   async function sendMessage(event) {
     event.preventDefault();
     const value = text.trim();
-    if (!value) return;
+    if (!value || !selectedGroupId) return;
 
     setText("");
     const socket = socketRef.current;
     if (socket?.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ type: "chat_message", text: value }));
+      socket.send(JSON.stringify({ type: "chat_message", text: value, groupId: selectedGroupId }));
       return;
     }
 
-    const data = await api("/chat/messages", { method: "POST", body: JSON.stringify({ text: value }) });
+    const data = await api("/chat/messages", { method: "POST", body: JSON.stringify({ text: value, groupId: selectedGroupId }) });
     setMessages((items) => [...items, data.message].slice(-50));
   }
+
+  const selectedGroup = groups.find((group) => group.id === selectedGroupId);
 
   return (
     <div className="page-enter grid min-h-[calc(100vh-9rem)] gap-6 lg:grid-cols-[1fr_280px]">
@@ -53,7 +80,9 @@ export default function Chat() {
         <div className="flex items-center justify-between border-b border-slate-200 p-5 dark:border-slate-800">
           <div>
             <h1 className="text-2xl font-bold">Учебный чат</h1>
-            <p className="text-sm text-slate-500">Общие вопросы по курсам и заданиям.</p>
+            <p className="text-sm text-slate-500">
+              {selectedGroup ? `Группа ${selectedGroup.title}` : "Выберите группу для общения."}
+            </p>
           </div>
           <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-semibold ${connected ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-100" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300"}`}>
             {connected ? <Wifi size={16} /> : <WifiOff size={16} />}
@@ -61,7 +90,7 @@ export default function Chat() {
           </span>
         </div>
 
-        <div className="flex-1 space-y-3 overflow-y-auto p-5">
+        <div ref={messagesRef} className="flex-1 space-y-3 overflow-y-auto p-5">
           {messages.map((message) => {
             const own = message.user?.id === user.id;
             return (
@@ -79,16 +108,21 @@ export default function Chat() {
               </div>
             );
           })}
-          {messages.length === 0 && (
+          {messages.length === 0 && selectedGroup && (
             <div className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-800">
-              Сообщений пока нет.
+              В этой группе пока нет сообщений.
+            </div>
+          )}
+          {!selectedGroup && (
+            <div className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-800">
+              Доступных групп пока нет. Администратор может добавить вас в группу.
             </div>
           )}
         </div>
 
         <form className="grid gap-3 border-t border-slate-200 p-4 dark:border-slate-800 sm:grid-cols-[1fr_auto]" onSubmit={sendMessage}>
-          <input className="input" value={text} onChange={(event) => setText(event.target.value)} placeholder="Напишите сообщение" maxLength={1000} />
-          <button className="btn-primary flex items-center justify-center gap-2" disabled={!text.trim()}>
+          <input className="input" value={text} onChange={(event) => setText(event.target.value)} placeholder="Напишите сообщение" maxLength={1000} disabled={!selectedGroup} />
+          <button className="btn-primary flex items-center justify-center gap-2" disabled={!text.trim() || !selectedGroup}>
             <SendHorizonal size={18} />
             Отправить
           </button>
@@ -96,10 +130,26 @@ export default function Chat() {
       </section>
 
       <aside className="panel h-fit space-y-3">
-        <h2 className="font-bold">Как использовать</h2>
-        <p className="text-sm text-slate-500 dark:text-slate-300">
-          Студенты могут задавать вопросы, а преподаватели отвечать в общем потоке. При активном WebSocket новые сообщения появляются сразу.
-        </p>
+        <h2 className="font-bold">Группы</h2>
+        <div className="space-y-2">
+          {groups.map((group) => (
+            <button
+              key={group.id}
+              className={`w-full rounded-lg border p-3 text-left transition ${
+                selectedGroupId === group.id
+                  ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-100"
+                  : "border-slate-200 hover:border-brand-300 dark:border-slate-700"
+              }`}
+              onClick={() => setSelectedGroupId(group.id)}
+            >
+              <span className="block font-semibold">{group.title}</span>
+              <span className="text-sm text-slate-500 dark:text-slate-300">
+                {group.studentCount ?? group.students?.length ?? 0} студентов
+              </span>
+            </button>
+          ))}
+          {groups.length === 0 && <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500 dark:bg-slate-800">Группы не назначены.</p>}
+        </div>
       </aside>
     </div>
   );

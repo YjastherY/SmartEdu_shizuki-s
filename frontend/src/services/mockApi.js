@@ -55,6 +55,7 @@ const initialState = {
     {
       id: "chat-1",
       text: "Добро пожаловать в учебный чат SmartEdu.",
+      groupId: "group-1",
       createdAt: new Date().toISOString(),
       user: { id: "user-2", name: "Anna Teacher", role: "TEACHER", avatarUrl: "" }
     }
@@ -534,12 +535,48 @@ function syncTeacherNotifications(state) {
     });
 }
 
+function splitPath(path) {
+  const [route, queryString = ""] = path.split("?");
+  return {
+    route,
+    query: new URLSearchParams(queryString)
+  };
+}
+
+function groupsForUser(state) {
+  if (state.user.role === "ADMIN") return state.groups;
+  if (state.user.role === "TEACHER") return state.groups.filter((group) => group.teacherId === state.user.id);
+  return state.groups.filter((group) => group.studentIds.includes(state.user.id) || group.id === state.user.groupId);
+}
+
+function resolveChatGroup(state, requestedGroupId) {
+  const groups = groupsForUser(state);
+  return groups.find((group) => group.id === requestedGroupId) || groups[0] || null;
+}
+
+function isVisibleLesson(lesson, user) {
+  if (user.role === "TEACHER" || user.role === "ADMIN") return true;
+  const scheduled = lesson.visibleFrom && new Date(lesson.visibleFrom) > new Date();
+  return lesson.isPublished !== false && !scheduled;
+}
+
+function visibleCoursesForUser(user) {
+  return courses.map((course) => ({
+    ...course,
+    modules: course.modules.map((module) => ({
+      ...module,
+      lessons: module.lessons.filter((lesson) => isVisibleLesson(lesson, user))
+    }))
+  }));
+}
+
 export async function mockApi(path, options = {}) {
   const state = getState();
+  const { route, query } = splitPath(path);
   const body = options.body instanceof FormData ? Object.fromEntries(options.body.entries()) : options.body ? JSON.parse(options.body) : {};
 
-  if (path === "/auth/login" || path === "/auth/register") {
-    if (path === "/auth/register") {
+  if (route === "/auth/login" || route === "/auth/register") {
+    if (route === "/auth/register") {
       state.user = { ...state.user, name: body.name, email: body.email };
       saveState(state);
     } else {
@@ -559,20 +596,33 @@ export async function mockApi(path, options = {}) {
     return { user: state.user, token: state.token };
   }
 
-  if (path === "/me") return { user: state.user };
-  if (path === "/notifications") return { notifications: state.notifications.filter((item) => isNotificationForUser(item, state.user)) };
-  if (path === "/notifications/read-all") {
+  if (route === "/me") return { user: state.user };
+  if (route === "/notifications") return { notifications: state.notifications.filter((item) => isNotificationForUser(item, state.user)) };
+  if (route === "/notifications/read-all") {
     state.notifications = state.notifications.map((item) => (isNotificationForUser(item, state.user) ? { ...item, read: true } : item));
     saveState(state);
     return { notifications: state.notifications.filter((item) => isNotificationForUser(item, state.user)) };
   }
-  if (path === "/chat/messages" && (!options.method || options.method === "GET")) {
-    return { messages: state.chatMessages.slice(-50) };
+  if (route === "/chat/groups") {
+    return {
+      groups: groupsForUser(state).map((group) => ({
+        ...group,
+        teacher: state.users.find((user) => user.id === group.teacherId),
+        studentCount: group.studentIds.length
+      }))
+    };
   }
-  if (path === "/chat/messages" && options.method === "POST") {
+  if (route === "/chat/messages" && (!options.method || options.method === "GET")) {
+    const group = resolveChatGroup(state, query.get("groupId"));
+    return { messages: group ? state.chatMessages.filter((message) => message.groupId === group.id).slice(-50) : [] };
+  }
+  if (route === "/chat/messages" && options.method === "POST") {
+    const group = resolveChatGroup(state, body.groupId);
+    if (!group) throw new Error("Группа не найдена");
     const message = {
       id: `chat-${Date.now()}`,
       text: body.text,
+      groupId: group.id,
       createdAt: new Date().toISOString(),
       user: { id: state.user.id, name: state.user.name, role: state.user.role, avatarUrl: state.user.avatarUrl }
     };
@@ -580,24 +630,85 @@ export async function mockApi(path, options = {}) {
     saveState(state);
     return { message };
   }
-  if (path === "/assistant/ask") return buildAssistantAnswer(state, body.question || "");
-  if (path === "/courses") return { courses };
-  if (path.startsWith("/courses/")) {
-    const course = courses.find((item) => item.id === path.split("/").at(-1));
+  if (route === "/assistant/ask") return buildAssistantAnswer(state, body.question || "");
+  if (route === "/courses" && (!options.method || options.method === "GET")) return { courses: visibleCoursesForUser(state.user) };
+  if (route === "/courses" && options.method === "POST") {
+    const course = {
+      id: `course-${Date.now()}`,
+      title: body.title,
+      description: body.description,
+      category: body.category,
+      level: body.level,
+      duration: body.duration,
+      imageUrl: body.imageUrl || "",
+      modules: []
+    };
+    courses.unshift(course);
+    return { course };
+  }
+  if (route.startsWith("/courses/") && route.endsWith("/modules") && options.method === "POST") {
+    const courseId = route.split("/")[2];
+    const course = courses.find((item) => item.id === courseId);
+    if (!course) throw new Error("Course not found");
+    const module = {
+      id: `module-${Date.now()}`,
+      title: body.title,
+      order: course.modules.length + 1,
+      lessons: []
+    };
+    course.modules.push(module);
+    return { module };
+  }
+  if (route.startsWith("/courses/")) {
+    const course = visibleCoursesForUser(state.user).find((item) => item.id === route.split("/").at(-1));
     if (!course) throw new Error("Course not found");
     return { course };
   }
-  if (path.startsWith("/lessons/") && path.endsWith("/complete")) {
-    const lessonId = path.split("/")[2];
+  if (route.startsWith("/modules/") && route.endsWith("/lessons") && options.method === "POST") {
+    const moduleId = route.split("/")[2];
+    const module = courses.flatMap((course) => course.modules).find((item) => item.id === moduleId);
+    if (!module) throw new Error("Module not found");
+    const lesson = {
+      id: `lesson-${Date.now()}`,
+      title: body.title,
+      type: body.type || "TEXT",
+      order: module.lessons.length + 1,
+      duration: body.duration || "10 мин",
+      content: body.content || "",
+      videoUrl: body.videoUrl || "",
+      imageUrl: body.imageUrl || "",
+      isPublished: body.isPublished ?? true,
+      visibleFrom: body.visibleFrom || null,
+      comments: []
+    };
+    module.lessons.push(lesson);
+    return { lesson };
+  }
+  if (route.startsWith("/lessons/") && route.endsWith("/complete")) {
+    const lessonId = route.split("/")[2];
     const lesson = findLesson(lessonId);
     if (!state.completedLessons.includes(lessonId)) state.completedLessons.push(lessonId);
     const progress = updateProgress(state, lesson.module.course.id);
     saveState(state);
     return { progress };
   }
-  if (path.startsWith("/lessons/")) {
-    const lesson = findLesson(path.split("/").at(-1));
+  if (route.startsWith("/lessons/") && options.method === "PUT") {
+    const lessonId = route.split("/").at(-1);
+    const sourceLesson = courses.flatMap((course) => course.modules).flatMap((module) => module.lessons).find((item) => item.id === lessonId);
+    if (!sourceLesson) throw new Error("Lesson not found");
+    Object.assign(sourceLesson, {
+      ...body,
+      content: body.content === "" ? "" : body.content ?? sourceLesson.content,
+      videoUrl: body.videoUrl === "" ? "" : body.videoUrl ?? sourceLesson.videoUrl,
+      imageUrl: body.imageUrl === "" ? "" : body.imageUrl ?? sourceLesson.imageUrl,
+      visibleFrom: body.visibleFrom === "" ? null : body.visibleFrom ?? sourceLesson.visibleFrom
+    });
+    return { lesson: sourceLesson };
+  }
+  if (route.startsWith("/lessons/")) {
+    const lesson = findLesson(route.split("/").at(-1));
     if (!lesson) throw new Error("Lesson not found");
+    if (!isVisibleLesson(lesson, state.user)) throw new Error("Lesson not found");
     if (lesson.test) {
       const attempts = state.attempts.filter((attempt) => attempt.testId === lesson.test.id);
       lesson.test = {
@@ -608,8 +719,8 @@ export async function mockApi(path, options = {}) {
     }
     return { lesson };
   }
-  if (path.startsWith("/tests/") && path.endsWith("/submit")) {
-    const testId = path.split("/")[2];
+  if (route.startsWith("/tests/") && route.endsWith("/submit")) {
+    const testId = route.split("/")[2];
     const lesson = courses.flatMap((course) => course.modules).flatMap((module) => module.lessons).find((item) => item.test?.id === testId);
     const attempts = state.attempts.filter((attempt) => attempt.testId === testId);
     if (lesson.test.deadline && new Date() > new Date(lesson.test.deadline)) {
@@ -684,10 +795,10 @@ export async function mockApi(path, options = {}) {
       progress
     };
   }
-  if (path === "/progress/me") {
+  if (route === "/progress/me") {
     return { progress: state.progress, certificates: state.certificates, attempts: state.attempts };
   }
-  if (path === "/comments") {
+  if (route === "/comments") {
     const lesson = findLesson(body.lessonId);
     const comment = {
       id: `comment-${Date.now()}`,
@@ -698,13 +809,13 @@ export async function mockApi(path, options = {}) {
     sourceLesson.comments = [comment, ...(sourceLesson.comments || [])];
     return { comment };
   }
-  if (path === "/users/settings") {
+  if (route === "/users/settings") {
     state.user = { ...state.user, ...body };
     state.users = state.users.map((item) => (item.id === state.user.id ? { ...item, name: state.user.name, email: state.user.email, role: state.user.role } : item));
     saveState(state);
     return { user: state.user };
   }
-  if (path === "/users/avatar") {
+  if (route === "/users/avatar") {
     const file = body.avatar;
     const avatarUrl = file instanceof File ? await fileToDataUrl(file) : state.user.avatarUrl;
     state.user = {
@@ -714,7 +825,7 @@ export async function mockApi(path, options = {}) {
     saveState(state);
     return { user: state.user, avatarUrl: state.user.avatarUrl };
   }
-  if (path === "/teacher/overview") {
+  if (route === "/teacher/overview") {
     const teacherGroups = state.groups.filter((group) => group.teacherId === state.user.id || state.user.role === "ADMIN");
     const groupIds = teacherGroups.map((group) => group.id);
     const students = state.users.filter((user) => groupIds.includes(user.groupId));
@@ -737,14 +848,14 @@ export async function mockApi(path, options = {}) {
       }))
     };
   }
-  if (path === "/teacher/tests") {
+  if (route === "/teacher/tests") {
     const test = { id: `custom-test-${Date.now()}`, ...body, createdAt: new Date().toISOString() };
     state.customTests = [test, ...state.customTests];
     saveState(state);
     return { test };
   }
-  if (path.startsWith("/teacher/submissions/") && path.endsWith("/grade")) {
-    const id = path.split("/")[3];
+  if (route.startsWith("/teacher/submissions/") && route.endsWith("/grade")) {
+    const id = route.split("/")[3];
     const submission = state.manualSubmissions.find((item) => item.id === id);
     const manualScore = Math.min(Number(body.score ?? submission?.score ?? 0), Number(submission?.maxScore || 100));
     const earnedPoints = Number(submission?.autoScore || 0) + manualScore;
@@ -775,8 +886,8 @@ export async function mockApi(path, options = {}) {
     saveState(state);
     return { submission: state.manualSubmissions.find((item) => item.id === id) };
   }
-  if (path.startsWith("/teacher/students/") && path.includes("/extensions/")) {
-    const [, , , studentId, , assignmentId] = path.split("/");
+  if (route.startsWith("/teacher/students/") && route.includes("/extensions/")) {
+    const [, , , studentId, , assignmentId] = route.split("/");
     state.deadlineExtensions = {
       ...state.deadlineExtensions,
       [studentId]: {
@@ -797,7 +908,7 @@ export async function mockApi(path, options = {}) {
     saveState(state);
     return { assignments: buildAssignments(state, studentId, insight), student };
   }
-  if (path === "/admin/overview") {
+  if (route === "/admin/overview") {
     return {
       users: state.users,
       groups: state.groups.map((group) => ({
@@ -808,15 +919,15 @@ export async function mockApi(path, options = {}) {
       courses
     };
   }
-  if (path.startsWith("/admin/users/") && path.endsWith("/role")) {
-    const id = path.split("/")[3];
+  if (route.startsWith("/admin/users/") && route.endsWith("/role")) {
+    const id = route.split("/")[3];
     state.users = state.users.map((user) => (user.id === id ? { ...user, role: body.role } : user));
     if (state.user.id === id) state.user = { ...state.user, role: body.role };
     saveState(state);
     return { users: state.users, user: state.user };
   }
-  if (path.startsWith("/admin/groups/")) {
-    const id = path.split("/")[3];
+  if (route.startsWith("/admin/groups/")) {
+    const id = route.split("/")[3];
     state.groups = state.groups.map((group) =>
       group.id === id
         ? {

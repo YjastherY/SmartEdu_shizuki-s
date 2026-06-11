@@ -70,8 +70,8 @@ async function main() {
       role: "ADMIN",
       notifications: {
         create: {
-          title: "Демо-данные готовы",
-          message: "Созданы пользователи, курсы и учебная группа."
+          title: "Платформа готова к проверке",
+          message: "Можно проверить курсы, группы, роли и демо-аккаунты."
         }
       }
     }
@@ -182,6 +182,14 @@ async function main() {
       teacherId: teacher.id,
       students: { connect: [{ id: student.id }, { id: secondStudent.id }] },
       courses: { create: { courseId: course.id } }
+    }
+  });
+
+  await prisma.chatMessage.create({
+    data: {
+      text: "Добро пожаловать в чат группы FE-101. Здесь можно обсуждать курс и задания.",
+      userId: teacher.id,
+      groupId: group.id
     }
   });
 

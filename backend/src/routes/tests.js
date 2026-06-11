@@ -122,6 +122,13 @@ router.post(
       return res.status(404).json({ message: "Test not found" });
     }
 
+    if (req.user.role === "STUDENT") {
+      const isScheduled = test.lesson.visibleFrom && test.lesson.visibleFrom > new Date();
+      if (!test.lesson.isPublished || isScheduled) {
+        return res.status(404).json({ message: "Test not found" });
+      }
+    }
+
     const effectiveDeadline = await getEffectiveDeadline(req.user.id, test);
 
     if (effectiveDeadline && new Date() > effectiveDeadline) {

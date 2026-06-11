@@ -1,9 +1,19 @@
-import { ShieldCheck, UsersRound } from "lucide-react";
+import { ImagePlus, ShieldCheck, UsersRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../services/api.js";
 
 export default function AdminPanel() {
   const [data, setData] = useState(null);
+  const [courseDraft, setCourseDraft] = useState({
+    title: "",
+    description: "",
+    category: "Frontend",
+    level: "Beginner",
+    duration: "6 часов",
+    imageUrl: "",
+    moduleTitle: "Первый модуль"
+  });
+  const [courseMessage, setCourseMessage] = useState("");
 
   useEffect(() => {
     api("/admin/overview").then(setData);
@@ -26,6 +36,44 @@ export default function AdminPanel() {
     const studentIds = exists ? group.studentIds.filter((id) => id !== studentId) : [...group.studentIds, studentId];
     await api(`/admin/groups/${group.id}`, { method: "PATCH", body: JSON.stringify({ studentIds }) });
     setData(await api("/admin/overview"));
+  }
+
+  async function createCourse(event) {
+    event.preventDefault();
+    setCourseMessage("");
+
+    try {
+      const result = await api("/courses", {
+        method: "POST",
+        body: JSON.stringify({
+          title: courseDraft.title,
+          description: courseDraft.description,
+          category: courseDraft.category,
+          level: courseDraft.level,
+          duration: courseDraft.duration,
+          imageUrl: courseDraft.imageUrl
+        })
+      });
+
+      await api(`/courses/${result.course.id}/modules`, {
+        method: "POST",
+        body: JSON.stringify({ title: courseDraft.moduleTitle || "Первый модуль" })
+      });
+
+      setCourseDraft({
+        title: "",
+        description: "",
+        category: "Frontend",
+        level: "Beginner",
+        duration: "6 часов",
+        imageUrl: "",
+        moduleTitle: "Первый модуль"
+      });
+      setData(await api("/admin/overview"));
+      setCourseMessage("Курс создан");
+    } catch (error) {
+      setCourseMessage(error.message || "Не удалось создать курс");
+    }
   }
 
   const teachers = data.users.filter((user) => user.role === "TEACHER" || user.role === "ADMIN");
@@ -53,6 +101,51 @@ export default function AdminPanel() {
             <p className="text-2xl font-bold">{data.groups.length}</p>
           </div>
         </div>
+      </section>
+
+      <section className="panel space-y-4">
+        <div>
+          <p className="text-sm font-semibold text-brand-600">Курсы</p>
+          <h2 className="text-xl font-bold">Создать курс</h2>
+          <p className="text-sm text-slate-500">Если баннер не указан или ссылка не загрузится, карточка покажет фирменную заглушку.</p>
+        </div>
+        <form className="grid gap-3 lg:grid-cols-2" onSubmit={createCourse}>
+          <label className="text-sm font-medium">
+            Название
+            <input className="input mt-1" value={courseDraft.title} onChange={(event) => setCourseDraft({ ...courseDraft, title: event.target.value })} required />
+          </label>
+          <label className="text-sm font-medium">
+            Категория
+            <input className="input mt-1" value={courseDraft.category} onChange={(event) => setCourseDraft({ ...courseDraft, category: event.target.value })} required />
+          </label>
+          <label className="text-sm font-medium lg:col-span-2">
+            Описание
+            <textarea className="input mt-1 min-h-24" value={courseDraft.description} onChange={(event) => setCourseDraft({ ...courseDraft, description: event.target.value })} required />
+          </label>
+          <label className="text-sm font-medium">
+            Уровень
+            <input className="input mt-1" value={courseDraft.level} onChange={(event) => setCourseDraft({ ...courseDraft, level: event.target.value })} required />
+          </label>
+          <label className="text-sm font-medium">
+            Длительность
+            <input className="input mt-1" value={courseDraft.duration} onChange={(event) => setCourseDraft({ ...courseDraft, duration: event.target.value })} required />
+          </label>
+          <label className="text-sm font-medium">
+            Первый модуль
+            <input className="input mt-1" value={courseDraft.moduleTitle} onChange={(event) => setCourseDraft({ ...courseDraft, moduleTitle: event.target.value })} />
+          </label>
+          <label className="text-sm font-medium">
+            Баннер курса
+            <div className="mt-1 flex gap-2">
+              <input className="input" type="url" placeholder="https://..." value={courseDraft.imageUrl} onChange={(event) => setCourseDraft({ ...courseDraft, imageUrl: event.target.value })} />
+              <span className="hidden items-center rounded-lg bg-slate-100 px-3 text-slate-500 dark:bg-slate-800 sm:flex"><ImagePlus size={18} /></span>
+            </div>
+          </label>
+          <div className="flex items-end gap-3 lg:col-span-2">
+            <button className="btn-primary">Создать курс</button>
+            {courseMessage && <p className={`text-sm font-semibold ${courseMessage === "Курс создан" ? "text-emerald-600" : "text-red-600"}`}>{courseMessage}</p>}
+          </div>
+        </form>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">

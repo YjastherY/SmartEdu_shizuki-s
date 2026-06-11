@@ -1,5 +1,5 @@
 import { Bot, BookOpen, SendHorizonal, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../services/api.js";
 
 const starters = [
@@ -12,6 +12,7 @@ const starters = [
 export default function Assistant() {
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(false);
+  const messagesRef = useRef(null);
   const [messages, setMessages] = useState([
     {
       role: "assistant",
@@ -59,9 +60,13 @@ export default function Assistant() {
 
   const lastSuggestions = messages.at(-1)?.suggestions?.length ? messages.at(-1).suggestions : starters;
 
+  useEffect(() => {
+    messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, loading]);
+
   return (
-    <div className="page-enter grid min-h-[calc(100vh-9rem)] gap-6 xl:grid-cols-[1fr_320px]">
-      <section className="panel flex min-h-[650px] flex-col overflow-hidden p-0">
+    <div className="page-enter grid h-[calc(100vh-9rem)] min-h-[620px] gap-6 xl:grid-cols-[1fr_320px]">
+      <section className="panel flex min-h-0 flex-col overflow-hidden p-0">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 p-5 dark:border-slate-800">
           <div className="flex items-center gap-3">
             <div className="soft-ring flex h-11 w-11 items-center justify-center rounded-lg bg-brand-600 text-white">
@@ -78,7 +83,7 @@ export default function Assistant() {
           </span>
         </div>
 
-        <div className="flex-1 space-y-4 overflow-y-auto p-5">
+        <div ref={messagesRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
           {messages.map((message, index) => (
             <Message key={`${message.role}-${index}`} message={message} onPick={(text) => ask(null, text)} />
           ))}

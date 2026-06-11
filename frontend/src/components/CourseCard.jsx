@@ -10,22 +10,21 @@ export default function CourseCard({ course }) {
 
   return (
     <article className="polished-card group">
-      <div className="h-40 overflow-hidden">
-        {imageUrl && !imageFailed ? (
+      <div className="relative h-40 overflow-hidden bg-gradient-to-br from-brand-600 via-sky-500 to-cyan-400">
+        <div className="flex h-full w-full flex-col justify-between p-5 text-white transition duration-500 group-hover:scale-105">
+          <span className="w-fit rounded-full bg-white/20 px-3 py-1 text-xs font-bold backdrop-blur">{course.category}</span>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-white/75">SmartEdu course</p>
+            <p className="mt-1 text-2xl font-black leading-tight">{course.title}</p>
+          </div>
+        </div>
+        {imageUrl && !imageFailed && (
           <img
-            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+            className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
             src={imageUrl}
             alt={course.title}
             onError={() => setImageFailed(true)}
           />
-        ) : (
-          <div className="flex h-full w-full flex-col justify-between bg-gradient-to-br from-brand-600 via-sky-500 to-cyan-400 p-5 text-white transition duration-500 group-hover:scale-105">
-            <span className="w-fit rounded-full bg-white/20 px-3 py-1 text-xs font-bold backdrop-blur">{course.category}</span>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-white/75">SmartEdu course</p>
-              <p className="mt-1 text-2xl font-black leading-tight">{course.title}</p>
-            </div>
-          </div>
         )}
       </div>
       <div className="p-5">

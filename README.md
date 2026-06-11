@@ -24,9 +24,10 @@ SmartEdu is an MVP educational platform for online courses, video lessons, tests
 - Learning assistant with answers based on course materials and student progress
 - Lesson comments
 - Notifications for students and teachers, including WebSocket updates
-- Online chat for students and teachers
+- Group chats with role-based access for students, teachers, and admins
 - Student profile and dark mode
 - Avatar and lesson video uploads with static file serving
+- Course creation, course banner fallback, learning materials, and scheduled material visibility
 - Teacher dashboard for test creation, grading, groups, and student progress
 - Admin dashboard for roles, groups, and teacher assignment
 - Docker-based local/server setup
@@ -185,7 +186,8 @@ password123
 - `GET /api/certificates/:code`
 - `POST /api/comments`
 - `GET /api/notifications`
-- `GET /api/chat/messages`
+- `GET /api/chat/groups`
+- `GET /api/chat/messages?groupId=<groupId>`
 - `POST /api/chat/messages`
 - `POST /api/assistant/ask`
 - `PATCH /api/users/settings`

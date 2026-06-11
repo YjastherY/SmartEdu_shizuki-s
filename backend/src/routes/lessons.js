@@ -44,8 +44,21 @@ const lessonSchema = z.object({
   order: z.number().int().min(1).optional(),
   duration: z.string().min(1).default("10 мин"),
   content: z.string().optional().or(z.literal("")),
-  videoUrl: z.string().url().optional().or(z.literal(""))
+  videoUrl: z.string().url().optional().or(z.literal("")),
+  imageUrl: z.string().url().optional().or(z.literal("")),
+  isPublished: z.boolean().optional(),
+  visibleFrom: z.string().optional().or(z.literal(""))
 });
+
+function lessonData(data) {
+  return {
+    ...data,
+    content: data.content === "" ? null : data.content,
+    videoUrl: data.videoUrl === "" ? null : data.videoUrl,
+    imageUrl: data.imageUrl === "" ? null : data.imageUrl,
+    visibleFrom: data.visibleFrom ? new Date(data.visibleFrom) : data.visibleFrom === "" ? null : undefined
+  };
+}
 
 async function nextModuleOrder(courseId) {
   const last = await prisma.module.findFirst({
@@ -159,10 +172,8 @@ router.post(
 
     const lesson = await prisma.lesson.create({
       data: {
-        ...data,
+        ...lessonData(data),
         order: data.order || (await nextLessonOrder(module.id)),
-        content: data.content || null,
-        videoUrl: data.videoUrl || null,
         moduleId: module.id
       }
     });
@@ -204,6 +215,13 @@ router.get(
 
     if (!lesson) {
       return res.status(404).json({ message: "Lesson not found" });
+    }
+
+    if (req.user.role === "STUDENT") {
+      const isScheduled = lesson.visibleFrom && lesson.visibleFrom > new Date();
+      if (!lesson.isPublished || isScheduled) {
+        return res.status(404).json({ message: "Lesson not found" });
+      }
     }
 
     if (lesson.test) {
@@ -252,11 +270,7 @@ router.put(
     const data = lessonSchema.partial().parse(req.body);
     const lesson = await prisma.lesson.update({
       where: { id: req.params.id },
-      data: {
-        ...data,
-        content: data.content === "" ? null : data.content,
-        videoUrl: data.videoUrl === "" ? null : data.videoUrl
-      }
+      data: lessonData(data)
     });
 
     res.json({ lesson });

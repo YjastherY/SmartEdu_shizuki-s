@@ -15,17 +15,10 @@ const courseSchema = z.object({
   imageUrl: z.string().url().optional().or(z.literal(""))
 });
 
-function courseInclude() {
+function visibleLessonFilter() {
   return {
-    modules: {
-      orderBy: { order: "asc" },
-      include: {
-        lessons: {
-          orderBy: { order: "asc" },
-          include: { test: { include: { questions: { include: { answers: true } } } } }
-        }
-      }
-    }
+    isPublished: true,
+    OR: [{ visibleFrom: null }, { visibleFrom: { lte: new Date() } }]
   };
 }
 
@@ -49,7 +42,12 @@ router.get(
       },
       include: {
         modules: {
-          include: { lessons: true }
+          include: {
+            lessons: {
+              where: visibleLessonFilter(),
+              orderBy: { order: "asc" }
+            }
+          }
         }
       },
       orderBy: { createdAt: "desc" }
@@ -64,7 +62,18 @@ router.get(
   asyncHandler(async (req, res) => {
     const course = await prisma.course.findUnique({
       where: { id: req.params.id },
-      include: courseInclude()
+      include: {
+        modules: {
+          orderBy: { order: "asc" },
+          include: {
+            lessons: {
+              where: visibleLessonFilter(),
+              orderBy: { order: "asc" },
+              include: { test: { include: { questions: { include: { answers: true } } } } }
+            }
+          }
+        }
+      }
     });
 
     if (!course) {

@@ -69,6 +69,7 @@ model Group {
   teacher   User?    @relation("GroupTeacher", fields: [teacherId], references: [id], onDelete: SetNull)
   students  User[]   @relation("GroupStudents")
   courses   GroupCourse[]
+  chatMessages ChatMessage[]
 }
 
 model GroupCourse {
@@ -114,6 +115,9 @@ model Lesson {
   duration    String
   content     String?
   videoUrl    String?
+  imageUrl    String?
+  isPublished Boolean      @default(true)
+  visibleFrom DateTime?
   moduleId    String
   module      Module       @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   test        Test?
@@ -263,6 +267,8 @@ model ChatMessage {
   id        String   @id @default(cuid())
   text      String
   userId    String
+  groupId   String?
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group     Group?   @relation(fields: [groupId], references: [id], onDelete: Cascade)
 }

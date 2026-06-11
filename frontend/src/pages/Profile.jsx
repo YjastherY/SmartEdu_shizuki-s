@@ -30,10 +30,22 @@ export default function Profile() {
     }
 
     try {
+      setUploading(Boolean(avatarFile));
+      if (avatarFile) {
+        const updatedUser = await uploadAvatar(avatarFile);
+        setForm((value) => ({
+          ...value,
+          avatarUrl: updatedUser.avatarUrl?.startsWith("http") ? updatedUser.avatarUrl : ""
+        }));
+        setAvatarFile(null);
+        setAvatarPreview("");
+      }
       await updateSettings(settings);
-      setMessage("Профиль обновлен");
+      setMessage("Профиль сохранен");
     } catch (error) {
       setMessage(error.message || "Не удалось сохранить профиль");
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -44,26 +56,6 @@ export default function Profile() {
     setAvatarFile(file);
     setAvatarPreview(URL.createObjectURL(file));
     setMessage("");
-  }
-
-  async function handleAvatarUpload() {
-    if (!avatarFile) return;
-
-    setUploading(true);
-    try {
-      const updatedUser = await uploadAvatar(avatarFile);
-      setForm((value) => ({
-        ...value,
-        avatarUrl: updatedUser.avatarUrl?.startsWith("http") ? updatedUser.avatarUrl : ""
-      }));
-      setAvatarFile(null);
-      setAvatarPreview("");
-      setMessage("Аватар обновлен");
-    } catch (error) {
-      setMessage(error.message || "Не удалось загрузить аватар");
-    } finally {
-      setUploading(false);
-    }
   }
 
   const avatarSrc = avatarPreview || assetUrl(user.avatarUrl) || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(user.name)}`;
@@ -85,26 +77,24 @@ export default function Profile() {
       <form className="panel space-y-4 hover:shadow-md" onSubmit={handleSubmit}>
         <div>
           <h2 className="text-xl font-bold">Настройки профиля</h2>
-          <p className="text-sm text-slate-500">Измените имя или загрузите новый аватар.</p>
+          <p className="text-sm text-slate-500">Измените имя, выберите аватар и сохраните профиль.</p>
         </div>
         <label className="block text-sm font-medium">
           Имя
           <input className="input mt-1" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
         </label>
-        <div className="grid gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700 sm:grid-cols-[1fr_auto] sm:items-end">
+        <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
           <label className="block text-sm font-medium">
             Файл аватара
             <input className="input mt-1" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={handleAvatarChange} />
           </label>
-          <button type="button" className="btn-secondary" disabled={!avatarFile || uploading} onClick={handleAvatarUpload}>
-            {uploading ? "Загружаем..." : "Загрузить"}
-          </button>
+          {avatarFile && <p className="mt-2 text-sm text-slate-500">Файл выбран. Нажмите «Сохранить», чтобы обновить аватар.</p>}
         </div>
         <label className="block text-sm font-medium">
           Ссылка на аватар, если файл не нужен
           <input className="input mt-1" value={form.avatarUrl} onChange={(event) => setForm({ ...form, avatarUrl: event.target.value })} />
         </label>
-        <button className="btn-primary">Сохранить</button>
+        <button className="btn-primary" disabled={uploading}>{uploading ? "Сохраняем..." : "Сохранить"}</button>
         {message && (
           <p className={`text-sm font-semibold ${message.includes("Не удалось") ? "text-red-600" : "text-emerald-600"}`}>
             {message}

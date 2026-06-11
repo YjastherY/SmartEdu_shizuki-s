@@ -30,26 +30,46 @@ async function resolveUser(request) {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
     return prisma.user.findUnique({
       where: { id: payload.userId },
-      select: { id: true, name: true, email: true, role: true, avatarUrl: true }
+      select: { id: true, name: true, email: true, role: true, avatarUrl: true, groupId: true }
     });
   } catch {
     return null;
   }
 }
 
+async function canUseGroup(user, groupId) {
+  if (!groupId) return false;
+  if (user.role === "ADMIN") return true;
+  if (user.role === "TEACHER") {
+    return Boolean(await prisma.group.findFirst({ where: { id: groupId, teacherId: user.id }, select: { id: true } }));
+  }
+
+  return user.groupId === groupId;
+}
+
 async function handleChatMessage(socket, user, payload) {
   const text = String(payload.text || "").trim();
+  const groupId = String(payload.groupId || "");
+
   if (text.length < 1 || text.length > 1000) {
     send(socket, { type: "error", message: "Сообщение должно быть от 1 до 1000 символов" });
     return;
   }
 
+  if (!(await canUseGroup(user, groupId))) {
+    send(socket, { type: "error", message: "Этот чат недоступен для аккаунта" });
+    return;
+  }
+
   const message = await prisma.chatMessage.create({
-    data: { text, userId: user.id },
-    include: { user: { select: { id: true, name: true, role: true, avatarUrl: true } } }
+    data: { text, userId: user.id, groupId },
+    include: {
+      group: true,
+      user: { select: { id: true, name: true, role: true, avatarUrl: true } }
+    }
   });
 
-  broadcast({ type: "chat_message", message });
+  await broadcastToGroup(groupId, { type: "chat_message", message });
 }
 
 export function attachRealtime(server) {
@@ -81,6 +101,23 @@ export function attachRealtime(server) {
 export function broadcast(payload) {
   for (const sockets of clients.values()) {
     for (const socket of sockets) send(socket, payload);
+  }
+}
+
+export async function broadcastToGroup(groupId, payload) {
+  const group = await prisma.group.findUnique({
+    where: { id: groupId },
+    include: { students: { select: { id: true } }, teacher: { select: { id: true } } }
+  });
+  const admins = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true } });
+  const userIds = new Set([
+    ...(group?.students || []).map((user) => user.id),
+    ...(group?.teacher ? [group.teacher.id] : []),
+    ...admins.map((user) => user.id)
+  ]);
+
+  for (const userId of userIds) {
+    sendToUser(userId, payload);
   }
 }
 

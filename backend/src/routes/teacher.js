@@ -24,6 +24,8 @@ const testSchema = z.object({
   attemptLimit: z.number().int().min(1).default(2),
   timeLimitMinutes: z.number().int().min(1).default(20),
   deadline: z.string().optional().or(z.literal("")),
+  isPublished: z.boolean().optional(),
+  visibleFrom: z.string().optional().or(z.literal("")),
   questions: z.array(questionSchema).min(1)
 });
 
@@ -229,6 +231,8 @@ router.post(
               order: 99,
               duration: `${data.timeLimitMinutes} мин`,
               content: data.description || "",
+              isPublished: data.isPublished ?? true,
+              visibleFrom: data.visibleFrom ? new Date(data.visibleFrom) : null,
               moduleId: firstModule.id
             }
           });
