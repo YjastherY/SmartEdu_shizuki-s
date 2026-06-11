@@ -50,3 +50,12 @@ export function assetUrl(url) {
   if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) return url;
   return `${API_ORIGIN}${url}`;
 }
+
+export function realtimeUrl() {
+  if (MOCK_API) return "";
+  const token = getToken();
+  if (!token) return "";
+
+  const origin = API_URL.startsWith("http") ? API_ORIGIN : window.location.origin;
+  return `${origin.replace(/^http/, "ws")}/ws?token=${encodeURIComponent(token)}`;
+}

@@ -51,6 +51,14 @@ const initialState = {
   ],
   certificates: [],
   attempts: [],
+  chatMessages: [
+    {
+      id: "chat-1",
+      text: "Добро пожаловать в учебный чат SmartEdu.",
+      createdAt: new Date().toISOString(),
+      user: { id: "user-2", name: "Anna Teacher", role: "TEACHER", avatarUrl: "" }
+    }
+  ],
   notifications: [
     {
       id: "notification-1",
@@ -314,6 +322,7 @@ function getState() {
   const saved = localStorage.getItem("smartedu_mock_state");
   const state = saved ? { ...initialState, ...JSON.parse(saved) } : initialState;
   state.deadlineExtensions = state.deadlineExtensions || {};
+  state.chatMessages = state.chatMessages || initialState.chatMessages;
   if (!state.manualSubmissions.some((item) => item.id === "submission-2")) {
     state.manualSubmissions.push({
       id: "submission-2",
@@ -517,6 +526,20 @@ export async function mockApi(path, options = {}) {
     state.notifications = state.notifications.map((item) => (isNotificationForUser(item, state.user) ? { ...item, read: true } : item));
     saveState(state);
     return { notifications: state.notifications.filter((item) => isNotificationForUser(item, state.user)) };
+  }
+  if (path === "/chat/messages" && (!options.method || options.method === "GET")) {
+    return { messages: state.chatMessages.slice(-50) };
+  }
+  if (path === "/chat/messages" && options.method === "POST") {
+    const message = {
+      id: `chat-${Date.now()}`,
+      text: body.text,
+      createdAt: new Date().toISOString(),
+      user: { id: state.user.id, name: state.user.name, role: state.user.role, avatarUrl: state.user.avatarUrl }
+    };
+    state.chatMessages = [...state.chatMessages, message].slice(-50);
+    saveState(state);
+    return { message };
   }
   if (path === "/courses") return { courses };
   if (path.startsWith("/courses/")) {

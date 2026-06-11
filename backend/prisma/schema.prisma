@@ -57,6 +57,7 @@ model User {
   testAttempts  TestAttempt[]
   manualSubmissions ManualSubmission[]
   deadlineExtensions DeadlineExtension[]
+  chatMessages  ChatMessage[]
 }
 
 model Group {
@@ -253,6 +254,14 @@ model Notification {
   title     String
   message   String
   read      Boolean  @default(false)
+  userId    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  text      String
   userId    String
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)

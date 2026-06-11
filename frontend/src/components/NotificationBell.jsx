@@ -1,6 +1,6 @@
 import { Bell } from "lucide-react";
 import { useEffect, useState } from "react";
-import { api } from "../services/api.js";
+import { api, realtimeUrl } from "../services/api.js";
 
 export default function NotificationBell() {
   const [open, setOpen] = useState(false);
@@ -8,6 +8,19 @@ export default function NotificationBell() {
 
   useEffect(() => {
     api("/notifications").then((data) => setNotifications(data.notifications)).catch(() => {});
+
+    const url = realtimeUrl();
+    if (!url) return undefined;
+
+    const socket = new WebSocket(url);
+    socket.onmessage = (event) => {
+      const payload = JSON.parse(event.data);
+      if (payload.type === "notification") {
+        setNotifications((items) => [payload.notification, ...items.filter((item) => item.id !== payload.notification.id)]);
+      }
+    };
+
+    return () => socket.close();
   }, []);
 
   const unread = notifications.filter((item) => !item.read).length;

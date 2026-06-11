@@ -1,6 +1,6 @@
 # SmartEdu
 
-SmartEdu is an MVP educational platform for online courses, video lessons, tests, manual assessment, progress tracking, comments, notifications, role-based dashboards, dark mode, and responsive usage on desktop and mobile.
+SmartEdu is an MVP educational platform for online courses, video lessons, tests, manual assessment, progress tracking, comments, live chat, notifications, role-based dashboards, dark mode, and responsive usage on desktop and mobile.
 
 ## Stack
 
@@ -22,7 +22,8 @@ SmartEdu is an MVP educational platform for online courses, video lessons, tests
 - Manual grading for open-answer tasks with teacher feedback
 - Student progress, course statistics, and viewable certificates
 - Lesson comments
-- Notifications for students and teachers
+- Notifications for students and teachers, including WebSocket updates
+- Online chat for students and teachers
 - Student profile and dark mode
 - Avatar and lesson video uploads with static file serving
 - Teacher dashboard for test creation, grading, groups, and student progress
@@ -167,6 +168,8 @@ password123
 - `GET /api/certificates/:code`
 - `POST /api/comments`
 - `GET /api/notifications`
+- `GET /api/chat/messages`
+- `POST /api/chat/messages`
 - `PATCH /api/users/settings`
 - `POST /api/users/avatar`
 - `PATCH /api/lessons/:id/video`
@@ -177,6 +180,19 @@ password123
 - `GET /api/admin/overview`
 - `PATCH /api/admin/users/:id/role`
 - `PATCH /api/admin/groups/:id`
+
+## Realtime
+
+Authenticated WebSocket endpoint:
+
+```text
+ws://localhost:3000/ws?token=<JWT>
+```
+
+Supported events:
+
+- `notification`: pushed when a teacher receives a manual-review task or a student receives a grade/deadline update
+- `chat_message`: pushed when a user sends a chat message
 
 ## Useful Scripts
 
@@ -207,6 +223,5 @@ npm run preview
 
 - Replace `prisma db push` in Docker with production migrations
 - Add generated PDF certificates
-- Add WebSocket notifications and live student chat
 - Add API integration tests
 - Add HTTPS, domain configuration, and production secrets management

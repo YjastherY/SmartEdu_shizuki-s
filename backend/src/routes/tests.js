@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { authRequired } from "../middleware/auth.js";
 import { prisma } from "../prisma.js";
+import { sendNotification } from "../realtime.js";
 import { asyncHandler } from "../utils.js";
 
 const router = Router();
@@ -90,13 +91,18 @@ async function notifyTeachersForSubmission(test, user) {
   });
   admins.forEach((admin) => teacherIds.add(admin.id));
 
-  await prisma.notification.createMany({
-    data: Array.from(teacherIds).map((teacherId) => ({
-      userId: teacherId,
-      title: "Работа на проверку",
-      message: `${user.name} отправил(а) развернутый ответ по тесту «${test.title}».`
-    }))
-  });
+  await Promise.all(
+    Array.from(teacherIds).map(async (teacherId) => {
+      const notification = await prisma.notification.create({
+        data: {
+          userId: teacherId,
+          title: "Работа на проверку",
+          message: `${user.name} отправил(а) развернутый ответ по тесту «${test.title}».`
+        }
+      });
+      sendNotification(teacherId, notification);
+    })
+  );
 }
 
 router.post(

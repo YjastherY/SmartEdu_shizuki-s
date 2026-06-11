@@ -33,6 +33,8 @@ This checklist covers the MVP flows required for SmartEdu acceptance testing.
 - Upload an avatar file and confirm it remains after page refresh.
 - Toggle dark mode and confirm the setting remains after refresh.
 - Open notifications, read them, and confirm unread counter clears.
+- Open the chat page, send a message, refresh the page, and confirm the message remains.
+- Open the app in two browser sessions and confirm a chat message appears without refreshing.
 
 ## Teacher Flows
 
@@ -43,6 +45,7 @@ This checklist covers the MVP flows required for SmartEdu acceptance testing.
 - Upload a video file for a video lesson.
 - Review a pending manual submission.
 - Add a score and feedback, save the grade, and confirm it moves to checked work.
+- Keep the student session open while grading and confirm the notification appears without refreshing.
 - Edit a checked grade and confirm the updated result is stored.
 - Open group progress and inspect a student's completed work and scores.
 - Extend a deadline for an unfinished assignment and confirm the new date is visible.

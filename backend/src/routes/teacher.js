@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { authRequired, teacherOrAdmin } from "../middleware/auth.js";
 import { prisma } from "../prisma.js";
+import { sendNotification } from "../realtime.js";
 import { asyncHandler } from "../utils.js";
 
 const router = Router();
@@ -304,13 +305,14 @@ router.patch(
       });
     }
 
-    await prisma.notification.create({
+    const notification = await prisma.notification.create({
       data: {
         userId: submission.userId,
         title: "Оценка выставлена",
         message: `Преподаватель оценил работу «${submission.question.test.title}»: ${manualScore} из ${submission.maxScore}.`
       }
     });
+    sendNotification(submission.userId, notification);
 
     res.json({ submission: { ...updated, finalScore: allManualGraded ? finalScore : null } });
   })
@@ -329,13 +331,14 @@ router.patch(
       include: { test: true, user: true }
     });
 
-    await prisma.notification.create({
+    const notification = await prisma.notification.create({
       data: {
         userId: req.params.studentId,
         title: "Срок задания продлён",
         message: `Преподаватель продлил срок задания «${extension.test.title}» до ${extension.deadline.toLocaleDateString("ru-RU")}.`
       }
     });
+    sendNotification(req.params.studentId, notification);
 
     res.json({ extension });
   })

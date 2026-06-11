@@ -2,12 +2,14 @@ import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
 import morgan from "morgan";
+import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ZodError } from "zod";
 import adminRoutes from "./routes/admin.js";
 import authRoutes from "./routes/auth.js";
 import certificateRoutes from "./routes/certificates.js";
+import chatRoutes from "./routes/chat.js";
 import commentRoutes from "./routes/comments.js";
 import courseRoutes from "./routes/courses.js";
 import lessonRoutes from "./routes/lessons.js";
@@ -17,6 +19,7 @@ import progressRoutes from "./routes/progress.js";
 import teacherRoutes from "./routes/teacher.js";
 import testRoutes from "./routes/tests.js";
 import userRoutes from "./routes/users.js";
+import { attachRealtime } from "./realtime.js";
 
 dotenv.config();
 
@@ -47,6 +50,7 @@ app.use("/api", testRoutes);
 app.use("/api", progressRoutes);
 app.use("/api", commentRoutes);
 app.use("/api", notificationRoutes);
+app.use("/api", chatRoutes);
 app.use("/api", certificateRoutes);
 app.use("/api", teacherRoutes);
 app.use("/api", adminRoutes);
@@ -73,6 +77,9 @@ app.use((error, req, res, next) => {
   res.status(500).json({ message: "Internal server error" });
 });
 
-app.listen(port, () => {
+const server = http.createServer(app);
+attachRealtime(server);
+
+server.listen(port, () => {
   console.log(`SmartEdu API is running on http://localhost:${port}`);
 });

@@ -1,10 +1,11 @@
-import { BarChart3, BookOpen, GraduationCap, LayoutDashboard, ShieldCheck, User, UsersRound } from "lucide-react";
+import { BarChart3, BookOpen, GraduationCap, LayoutDashboard, MessageCircle, ShieldCheck, User, UsersRound } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 
 const items = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/courses", label: "Курсы", icon: BookOpen },
+  { to: "/chat", label: "Чат", icon: MessageCircle },
   { to: "/progress", label: "Прогресс", icon: BarChart3 },
   { to: "/profile", label: "Профиль", icon: User }
 ];
