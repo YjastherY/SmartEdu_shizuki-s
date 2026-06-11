@@ -9,6 +9,7 @@ This document maps the original four-week assignment to the implemented MVP.
 | React project and routing | Done | `frontend/src/App.jsx` routes login, register, dashboard, courses, lessons, profile, progress, assistant, chat, teacher, and admin pages. |
 | Backend server structure | Done | `backend/src/server.js` mounts Express routes under `/api`. |
 | Docker setup and environments | Done | `docker-compose.yml`, `docker-compose.server.yml`, `.env.server.example`, `backend/.env.example`, `frontend/.env.example`. |
+| Trello/Jira planning board | Done | `docs/PROJECT_BOARD.md` contains a Kanban-style board with backlog, review, and done columns. |
 | UI library and base components | Done | TailwindCSS plus `Layout`, `Sidebar`, `Header`, `CourseCard`, `LessonPlayer`, `TestForm`, `ProgressChart`, `NotificationBell`, and `ThemeToggle`. |
 | PostgreSQL and models | Done | Prisma PostgreSQL schema includes users, courses, modules, lessons, tests, questions, answers, progress, certificates, comments, notifications, groups, submissions, deadlines, and chat messages. |
 | CI and smoke testing | Done | `.github/workflows/ci.yml` and `backend/scripts/smoke.js`. |
@@ -52,6 +53,8 @@ This document maps the original four-week assignment to the implemented MVP.
 | Logging | Done | `backend/src/logger.js` writes structured request logs with request ids. |
 | Final animations | Done | `frontend/src/styles.css` page transitions and polished card interactions. |
 | Code review and documentation | Done | `README.md`, `docs/QA.md`, `docs/DEMO.md`, this plan status, CI checks. |
+| Final presentation | Done | `docs/PRESENTATION.md` provides the slide-by-slide presentation outline. |
+| Retrospective | Done | `docs/RETROSPECTIVE.md` contains results, decisions, difficulties, and next steps. |
 | Final online check | Done | `npm run smoke` verifies deployed Docker services from inside the server network. |
 
 ## Extra Tasks

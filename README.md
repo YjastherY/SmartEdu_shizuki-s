@@ -238,6 +238,9 @@ npm run preview
 - [QA Test Plan](docs/QA.md)
 - [Demo Script](docs/DEMO.md)
 - [Plan Status](docs/PLAN_STATUS.md)
+- [Project Board](docs/PROJECT_BOARD.md)
+- [Presentation Outline](docs/PRESENTATION.md)
+- [Retrospective](docs/RETROSPECTIVE.md)
 
 ## Logging
 
