@@ -58,6 +58,7 @@ model User {
   manualSubmissions ManualSubmission[]
   deadlineExtensions DeadlineExtension[]
   chatMessages  ChatMessage[]
+  courses       CourseUser[]
 }
 
 model Group {
@@ -96,6 +97,17 @@ model Course {
   progress    Progress[]
   certificates Certificate[]
   groups      GroupCourse[]
+  users       CourseUser[]
+}
+
+model CourseUser {
+  id       String @id @default(cuid())
+  userId   String
+  courseId String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
 }
 
 model Module {

@@ -4,6 +4,7 @@ import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import Assistant from "./pages/Assistant.jsx";
 import Chat from "./pages/Chat.jsx";
 import CourseDetail from "./pages/CourseDetail.jsx";
+import CourseBuilder from "./pages/CourseBuilder.jsx";
 import Courses from "./pages/Courses.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Lesson from "./pages/Lesson.jsx";
@@ -29,6 +30,22 @@ export default function App() {
       >
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/courses" element={<Courses />} />
+        <Route
+          path="/courses/builder"
+          element={
+            <ProtectedRoute roles={["TEACHER", "ADMIN"]}>
+              <CourseBuilder />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/courses/builder/:courseId"
+          element={
+            <ProtectedRoute roles={["TEACHER", "ADMIN"]}>
+              <CourseBuilder />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/courses/:courseId" element={<CourseDetail />} />
         <Route path="/lessons/:lessonId" element={<Lesson />} />
         <Route path="/profile" element={<Profile />} />

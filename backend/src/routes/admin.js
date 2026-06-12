@@ -11,6 +11,7 @@ const roleSchema = z.object({
 });
 
 const groupSchema = z.object({
+  title: z.string().min(2).optional(),
   teacherId: z.string().nullable().optional(),
   studentIds: z.array(z.string()).optional(),
   courseIds: z.array(z.string()).optional()
@@ -43,7 +44,17 @@ router.get(
         },
         orderBy: { title: "asc" }
       }),
-      prisma.course.findMany({ orderBy: { title: "asc" } })
+      prisma.course.findMany({
+        include: {
+          groups: true,
+          users: true,
+          modules: {
+            orderBy: { order: "asc" },
+            include: { lessons: { orderBy: { order: "asc" }, include: { test: { include: { questions: { include: { answers: true } } } } } } }
+          }
+        },
+        orderBy: { title: "asc" }
+      })
     ]);
 
     res.json({
@@ -80,6 +91,44 @@ router.patch(
     const users = await prisma.user.findMany({ select: userSelect(), orderBy: { name: "asc" } });
 
     res.json({ user, users });
+  })
+);
+
+router.post(
+  "/admin/groups",
+  authRequired,
+  adminOnly,
+  asyncHandler(async (req, res) => {
+    const data = groupSchema.extend({ title: z.string().min(2) }).parse(req.body);
+
+    const group = await prisma.group.create({
+      data: {
+        title: data.title,
+        teacherId: data.teacherId || null,
+        students: data.studentIds?.length ? { connect: data.studentIds.map((id) => ({ id })) } : undefined,
+        courses: data.courseIds?.length
+          ? { create: data.courseIds.map((courseId) => ({ courseId })) }
+          : undefined
+      },
+      include: {
+        teacher: { select: userSelect() },
+        students: { select: userSelect(), orderBy: { name: "asc" } },
+        courses: { include: { course: true } }
+      }
+    });
+
+    res.status(201).json({
+      group: {
+        id: group.id,
+        title: group.title,
+        teacherId: group.teacherId,
+        teacher: group.teacher,
+        studentIds: group.students.map((student) => student.id),
+        students: group.students,
+        courseIds: group.courses.map((item) => item.courseId),
+        courses: group.courses.map((item) => item.course)
+      }
+    });
   })
 );
 

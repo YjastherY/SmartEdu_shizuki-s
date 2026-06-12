@@ -1,10 +1,10 @@
 import { BookOpen, CheckCircle2, ClipboardCheck, Plus, Trash2, Upload, UsersRound } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { api, assetUrl } from "../services/api.js";
 
 const tabs = [
   { id: "create", label: "Создание теста" },
-  { id: "materials", label: "Материалы" },
   { id: "review", label: "Проверка" },
   { id: "progress", label: "Успеваемость" }
 ];
@@ -222,9 +222,14 @@ export default function TeacherPanel() {
 
   return (
     <div className="page-enter space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Кабинет преподавателя</h1>
-        <p className="text-sm text-slate-500">Проверка работ, редактор тестов и аналитика по группам.</p>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Кабинет преподавателя</h1>
+          <p className="text-sm text-slate-500">Проверка работ, тесты, конструктор курсов и аналитика по группам.</p>
+        </div>
+        <Link className="btn-primary flex w-fit items-center gap-2" to="/courses/builder">
+          <BookOpen size={18} /> Открыть конструктор
+        </Link>
       </div>
 
       <section className="grid gap-4 md:grid-cols-4">

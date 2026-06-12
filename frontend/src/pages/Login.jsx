@@ -57,11 +57,11 @@ export default function Login() {
         <button className="btn-primary mt-6 w-full" disabled={loading}>
           {loading ? "Входим..." : "Войти"}
         </button>
-        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+        <div className="mt-4 flex flex-wrap gap-2">
           {demoAccounts.map((account) => (
             <button
               key={account.email}
-              className="btn-secondary px-3"
+              className="btn-secondary flex-1 whitespace-nowrap px-3"
               type="button"
               onClick={() => {
                 setEmail(account.email);

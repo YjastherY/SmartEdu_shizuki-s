@@ -48,7 +48,7 @@ export default function Dashboard() {
 
 function Stat({ icon: Icon, label, value }) {
   return (
-    <div className="panel group flex items-center gap-4 hover:-translate-y-1 hover:shadow-md">
+    <div className="panel group flex items-center gap-4 transition hover:-translate-y-1 hover:bg-white hover:shadow-md dark:hover:bg-slate-900">
       <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-brand-50 text-brand-700 transition group-hover:scale-105 dark:bg-brand-950 dark:text-brand-100">
         <Icon />
       </div>

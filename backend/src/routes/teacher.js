@@ -49,6 +49,16 @@ function answerData(question) {
   }));
 }
 
+function questionsCreateData(questions) {
+  return questions.map((question, index) => ({
+    text: question.text,
+    type: question.type,
+    maxScore: question.maxScore,
+    order: index + 1,
+    answers: { create: answerData(question) }
+  }));
+}
+
 function assignmentStatus(test, extension) {
   const deadline = extension?.deadline || test.deadline;
   if (!deadline) return "ACTIVE";
@@ -137,9 +147,11 @@ router.get(
     const courses = await prisma.course.findMany({
       where: courseFilter,
       include: {
+        groups: true,
+        users: true,
         modules: {
           orderBy: { order: "asc" },
-          include: { lessons: { orderBy: { order: "asc" } } }
+          include: { lessons: { orderBy: { order: "asc" }, include: { test: { include: { questions: { include: { answers: true } } } } } } }
         }
       },
       orderBy: { createdAt: "desc" }
@@ -249,19 +261,57 @@ router.post(
         lessonId: lesson.id,
         creatorId: req.user.id,
         questions: {
-          create: data.questions.map((question, index) => ({
-            text: question.text,
-            type: question.type,
-            maxScore: question.maxScore,
-            order: index + 1,
-            answers: { create: answerData(question) }
-          }))
+          create: questionsCreateData(data.questions)
         }
       },
       include: { questions: { include: { answers: true } } }
     });
 
     res.status(201).json({ test });
+  })
+);
+
+router.put(
+  "/teacher/tests/:id",
+  authRequired,
+  teacherOrAdmin,
+  asyncHandler(async (req, res) => {
+    const data = testSchema.omit({ courseId: true, lessonId: true }).parse(req.body);
+    const test = await prisma.test.findUnique({
+      where: { id: req.params.id },
+      include: { lesson: true }
+    });
+
+    if (!test) return res.status(404).json({ message: "Test not found" });
+
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.lesson.update({
+        where: { id: test.lessonId },
+        data: {
+          title: data.title,
+          type: "TEST",
+          duration: `${data.timeLimitMinutes} мин`,
+          content: data.description || "",
+          isPublished: data.isPublished ?? true,
+          visibleFrom: data.visibleFrom ? new Date(data.visibleFrom) : null
+        }
+      });
+      await tx.question.deleteMany({ where: { testId: test.id } });
+      return tx.test.update({
+        where: { id: test.id },
+        data: {
+          title: data.title,
+          description: data.description || null,
+          attemptLimit: data.attemptLimit,
+          timeLimitMinutes: data.timeLimitMinutes,
+          deadline: data.deadline ? new Date(data.deadline) : null,
+          questions: { create: questionsCreateData(data.questions) }
+        },
+        include: { questions: { include: { answers: true } } }
+      });
+    });
+
+    res.json({ test: updated });
   })
 );
 

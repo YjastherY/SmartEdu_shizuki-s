@@ -3,7 +3,9 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import LessonPlayer from "../components/LessonPlayer.jsx";
 import TestForm from "../components/TestForm.jsx";
-import { api } from "../services/api.js";
+import { api, assetUrl } from "../services/api.js";
+
+const blockPrefix = "smartedu-blocks:";
 
 export default function Lesson() {
   const { lessonId } = useParams();
@@ -44,7 +46,7 @@ export default function Lesson() {
         </div>
         {lesson.type === "VIDEO" && <LessonPlayer lesson={lesson} />}
         <div className="panel hover:shadow-md">
-          <p className="text-slate-600 dark:text-slate-300">{lesson.content}</p>
+          <LessonContent lesson={lesson} />
           {lesson.type !== "TEST" && (
             <button className="btn-primary mt-4" onClick={markComplete}>Отметить урок пройденным</button>
           )}
@@ -72,4 +74,50 @@ export default function Lesson() {
       </aside>
     </div>
   );
+}
+
+function LessonContent({ lesson }) {
+  const blocks = parseLessonBlocks(lesson.content, lesson.imageUrl);
+
+  if (lesson.type === "TEST") {
+    return <p className="text-slate-600 dark:text-slate-300">{lesson.content}</p>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {blocks.map((block, index) => {
+        if (block.type === "link") {
+          return (
+            <a key={`${block.type}-${index}`} className="inline-flex font-semibold text-brand-600" href={block.value} target="_blank" rel="noreferrer">
+              {block.label || block.value}
+            </a>
+          );
+        }
+
+        if (block.type === "image") {
+          return (
+            <img key={`${block.type}-${index}`} className="max-h-[420px] w-full rounded-lg object-cover" src={assetUrl(block.value)} alt={block.alt || "Иллюстрация к материалу"} />
+          );
+        }
+
+        return <p key={`${block.type}-${index}`} className="whitespace-pre-line text-slate-600 dark:text-slate-300">{block.value}</p>;
+      })}
+      {blocks.length === 0 && <p className="text-slate-500">Материал пока пустой.</p>}
+    </div>
+  );
+}
+
+function parseLessonBlocks(content = "", imageUrl = "") {
+  if (content?.startsWith(blockPrefix)) {
+    try {
+      const blocks = JSON.parse(content.slice(blockPrefix.length));
+      return Array.isArray(blocks) ? blocks.filter((block) => block.value || block.label || block.alt) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  const blocks = content ? [{ type: "text", value: content }] : [];
+  if (imageUrl) blocks.push({ type: "image", value: imageUrl, alt: "" });
+  return blocks;
 }
