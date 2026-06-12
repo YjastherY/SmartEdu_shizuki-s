@@ -594,22 +594,22 @@ function ReviewWorkspace({
   const [courseFilter, setCourseFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sort, setSort] = useState("newest");
-  const [selectedSubmissionId, setSelectedSubmissionId] = useState("");
-  const studentSubmissions = submissions.filter((item) => item.student?.id === selectedStudentId || item.studentId === selectedStudentId);
-  const courses = Array.from(new Set(studentSubmissions.map((item) => item.course?.title).filter(Boolean)));
-  const filteredSubmissions = studentSubmissions
-    .filter((item) => courseFilter === "all" || item.course?.title === courseFilter)
+  const [selectedWorkId, setSelectedWorkId] = useState("");
+  const studentWorks = buildReviewWorks(submissions, selectedStudent, selectedStudentId);
+  const courses = Array.from(new Set(studentWorks.map((item) => item.course).filter(Boolean)));
+  const filteredWorks = studentWorks
+    .filter((item) => courseFilter === "all" || item.course === courseFilter)
     .filter((item) => statusFilter === "all" || item.status === statusFilter)
     .sort((a, b) => {
       if (sort === "status") return String(a.status).localeCompare(String(b.status), "ru");
-      const left = new Date(a.updatedAt || a.createdAt || 0).getTime();
-      const right = new Date(b.updatedAt || b.createdAt || 0).getTime();
+      const left = new Date(a.dateValue || 0).getTime();
+      const right = new Date(b.dateValue || 0).getTime();
       return sort === "oldest" ? left - right : right - left;
     });
-  const selectedSubmission = filteredSubmissions.find((item) => item.id === selectedSubmissionId) || filteredSubmissions[0];
+  const selectedWork = filteredWorks.find((item) => item.id === selectedWorkId) || filteredWorks[0];
 
   useEffect(() => {
-    setSelectedSubmissionId(filteredSubmissions[0]?.id || "");
+    setSelectedWorkId(filteredWorks[0]?.id || "");
   }, [selectedStudentId, courseFilter, statusFilter, sort]);
 
   return (
@@ -683,6 +683,10 @@ function ReviewWorkspace({
                     <option value="all">Все статусы</option>
                     <option value="PENDING">Непроверенные</option>
                     <option value="GRADED">Проверенные</option>
+                    <option value="SUBMITTED">Сданные</option>
+                    <option value="OVERDUE">Просроченные</option>
+                    <option value="EXTENDED">Продленные</option>
+                    <option value="ACTIVE">Активные</option>
                   </select>
                   <select className="input" value={sort} onChange={(event) => setSort(event.target.value)}>
                     <option value="newest">Сначала новые</option>
@@ -699,22 +703,24 @@ function ReviewWorkspace({
           <div className="grid gap-5 2xl:grid-cols-[340px_1fr]">
             <div className="panel space-y-3">
               <h3 className="font-bold">Работы ученика</h3>
-              {filteredSubmissions.map((item) => (
+              {filteredWorks.map((item) => (
                 <button
                   key={item.id}
-                  className={`w-full rounded-lg border p-3 text-left transition ${selectedSubmission?.id === item.id ? "border-brand-500 bg-brand-50 dark:bg-brand-950" : "border-slate-200 hover:border-brand-300 dark:border-slate-700"}`}
-                  onClick={() => setSelectedSubmissionId(item.id)}
+                  className={`w-full rounded-lg border p-3 text-left transition ${selectedWork?.id === item.id ? "border-brand-500 bg-brand-50 dark:bg-brand-950" : "border-slate-200 hover:border-brand-300 dark:border-slate-700"}`}
+                  onClick={() => setSelectedWorkId(item.id)}
                 >
-                  <span className="block font-semibold">{item.testTitle}</span>
-                  <span className="text-sm text-slate-500">{item.course?.title} • {item.status === "PENDING" ? "на проверке" : "проверено"}</span>
+                  <span className="block font-semibold">{item.title}</span>
+                  <span className="text-sm text-slate-500">{item.course} • {reviewStatusLabel(item.status)}</span>
                 </button>
               ))}
-              {filteredSubmissions.length === 0 && <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-800">Работ по фильтрам нет.</p>}
+              {filteredWorks.length === 0 && <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-800">Работ по фильтрам нет.</p>}
             </div>
 
             <div>
-              {selectedSubmission ? (
-                <SubmissionCard item={selectedSubmission} grade={grade} setGrade={setGrade} gradeSubmission={gradeSubmission} autoSave />
+              {selectedWork?.type === "submission" ? (
+                <SubmissionCard item={selectedWork.submission} grade={grade} setGrade={setGrade} gradeSubmission={gradeSubmission} autoSave />
+              ) : selectedWork ? (
+                <WorkSummaryCard work={selectedWork} />
               ) : (
                 <div className="panel text-sm text-slate-500">Выберите работу, чтобы открыть ответы.</div>
               )}
@@ -724,6 +730,104 @@ function ReviewWorkspace({
       </section>
     </div>
   );
+}
+
+function buildReviewWorks(submissions, selectedStudent, selectedStudentId) {
+  if (!selectedStudent) return [];
+
+  const manual = submissions
+    .filter((item) => item.student?.id === selectedStudentId || item.studentId === selectedStudentId)
+    .map((submission) => ({
+      id: submission.id,
+      type: "submission",
+      title: submission.testTitle,
+      course: submission.course?.title || "Курс",
+      status: submission.status,
+      dateValue: submission.updatedAt || submission.createdAt || "",
+      details: submission.status === "GRADED"
+        ? `Итог ${submission.finalScore ?? 0}%`
+        : "Требуется ручная проверка",
+      submission
+    }));
+
+  const grades = (selectedStudent.grades || []).map((grade) => ({
+    id: `grade-${selectedStudent.id}-${grade.title}`,
+    type: "grade",
+    title: grade.title,
+    course: selectedStudent.assignments?.find((assignment) => assignment.title === grade.title)?.course || selectedStudent.group || "Курс",
+    status: grade.details.some((detail) => String(detail.value).includes("На проверке")) ? "PENDING" : "GRADED",
+    dateValue: "",
+    score: grade.score,
+    details: grade.details.map((detail) => `${detail.label}: ${detail.value}`).join("; ")
+  }));
+
+  const assignments = (selectedStudent.assignments || []).map((assignment) => ({
+    id: `assignment-${selectedStudent.id}-${assignment.id}`,
+    type: "assignment",
+    title: assignment.title,
+    course: assignment.course,
+    status: assignment.submitted ? "SUBMITTED" : assignment.status,
+    dateValue: assignment.effectiveDate,
+    details: assignment.submitted
+      ? "Работа сдана"
+      : `Срок сдачи: ${new Date(assignment.effectiveDate).toLocaleDateString("ru-RU")}`
+  }));
+
+  const works = new Map();
+  [...manual, ...grades, ...assignments].forEach((work) => {
+    const key = `${work.title}-${work.course}`;
+    const existing = works.get(key);
+    if (!existing || work.type === "submission" || existing.status !== "PENDING") works.set(key, work);
+  });
+
+  return Array.from(works.values());
+}
+
+function WorkSummaryCard({ work }) {
+  return (
+    <div className="panel space-y-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="font-semibold">{work.title}</p>
+          <p className="text-sm text-slate-500">{work.course}</p>
+        </div>
+        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${reviewStatusClass(work.status)}`}>
+          {reviewStatusLabel(work.status)}
+        </span>
+      </div>
+      {work.score != null && (
+        <div className="rounded-lg bg-brand-50 p-4 text-brand-700 dark:bg-brand-950 dark:text-brand-100">
+          <p className="text-sm font-semibold">Оценка</p>
+          <p className="text-2xl font-bold">{work.score}%</p>
+        </div>
+      )}
+      <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300">{work.details}</p>
+    </div>
+  );
+}
+
+function reviewStatusLabel(status) {
+  const labels = {
+    PENDING: "на проверке",
+    GRADED: "проверено",
+    SUBMITTED: "сдано",
+    OVERDUE: "просрочено",
+    EXTENDED: "продлено",
+    ACTIVE: "активно"
+  };
+  return labels[status] || status;
+}
+
+function reviewStatusClass(status) {
+  const classes = {
+    PENDING: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-100",
+    GRADED: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-100",
+    SUBMITTED: "bg-brand-100 text-brand-700 dark:bg-brand-950 dark:text-brand-100",
+    OVERDUE: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-100",
+    EXTENDED: "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-100",
+    ACTIVE: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+  };
+  return classes[status] || classes.ACTIVE;
 }
 
 function ReviewTab({ submissions, pending, grade, setGrade, gradeSubmission }) {
