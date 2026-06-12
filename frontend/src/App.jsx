@@ -1,12 +1,12 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
-import Assistant from "./pages/Assistant.jsx";
 import Chat from "./pages/Chat.jsx";
 import CourseDetail from "./pages/CourseDetail.jsx";
 import CourseBuilder from "./pages/CourseBuilder.jsx";
 import Courses from "./pages/Courses.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
+import Grades from "./pages/Grades.jsx";
 import Lesson from "./pages/Lesson.jsx";
 import Login from "./pages/Login.jsx";
 import Profile from "./pages/Profile.jsx";
@@ -50,7 +50,7 @@ export default function App() {
         <Route path="/lessons/:lessonId" element={<Lesson />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/progress" element={<Progress />} />
-        <Route path="/assistant" element={<Assistant />} />
+        <Route path="/grades" element={<Grades />} />
         <Route path="/chat" element={<Chat />} />
         <Route
           path="/teacher"

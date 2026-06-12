@@ -22,8 +22,20 @@ router.get(
     const attempts = await prisma.testAttempt.findMany({
       where: { userId: req.user.id },
       orderBy: { createdAt: "desc" },
-      take: 5,
-      include: { test: { include: { lesson: true } } }
+      include: {
+        test: {
+          include: {
+            lesson: {
+              include: {
+                module: {
+                  include: { course: true }
+                }
+              }
+            }
+          }
+        },
+        manualSubmissions: true
+      }
     });
 
     res.json({ progress, certificates, attempts });

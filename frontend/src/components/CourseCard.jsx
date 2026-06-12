@@ -15,7 +15,7 @@ export default function CourseCard({ course }) {
   }, [imageUrl]);
 
   return (
-    <article className="polished-card group">
+    <Link className="polished-card group block focus:outline-none focus:ring-2 focus:ring-brand-500" to={`/courses/${course.id}`}>
       <div className="relative h-40 overflow-hidden bg-gradient-to-br from-brand-600 via-sky-500 to-cyan-400">
         {imageUrl && !imageFailed && (
           <img
@@ -53,10 +53,10 @@ export default function CourseCard({ course }) {
           </span>
           <span>{lessonCount} урока</span>
         </div>
-        <Link className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-brand-600 transition group-hover:gap-3" to={`/courses/${course.id}`}>
+        <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-brand-600 transition group-hover:gap-3">
           Открыть курс <ArrowRight className="transition group-hover:translate-x-1" size={16} />
-        </Link>
+        </span>
       </div>
-    </article>
+    </Link>
   );
 }

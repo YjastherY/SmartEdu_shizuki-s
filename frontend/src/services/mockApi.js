@@ -403,6 +403,27 @@ function findLesson(id) {
   return null;
 }
 
+function enrichAttempt(attempt) {
+  const lesson = courses.flatMap((course) => course.modules).flatMap((module) => module.lessons).find((item) => item.test?.id === attempt.testId);
+  if (!lesson) return attempt;
+  const course = courses.find((item) => item.modules.some((module) => module.lessons.some((candidate) => candidate.id === lesson.id)));
+  const module = course?.modules.find((item) => item.lessons.some((candidate) => candidate.id === lesson.id));
+
+  return {
+    ...attempt,
+    test: {
+      ...(attempt.test || lesson.test),
+      lesson: {
+        ...lesson,
+        module: {
+          ...module,
+          course
+        }
+      }
+    }
+  };
+}
+
 function updateProgress(state, courseId) {
   const course = courses.find((item) => item.id === courseId);
   const totalLessons = course.modules.reduce((sum, module) => sum + module.lessons.length, 0);
@@ -845,7 +866,7 @@ export async function mockApi(path, options = {}) {
     };
   }
   if (route === "/progress/me") {
-    return { progress: state.progress, certificates: state.certificates, attempts: state.attempts };
+    return { progress: state.progress, certificates: state.certificates, attempts: state.attempts.map(enrichAttempt) };
   }
   if (route === "/comments") {
     const lesson = findLesson(body.lessonId);
