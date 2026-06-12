@@ -29,14 +29,14 @@ export default function CourseDetail() {
             <img
               className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
               src={assetUrl(course.imageUrl)}
-              alt={course.title}
+              alt=""
+              aria-hidden="true"
               onError={() => setImageFailed(true)}
             />
           ) : (
             <div className="flex h-full w-full flex-col justify-between bg-gradient-to-br from-brand-600 via-sky-500 to-cyan-400 p-6 text-white transition duration-700 group-hover:scale-105">
               <span className="w-fit rounded-full bg-white/20 px-3 py-1 text-xs font-bold backdrop-blur">{course.category}</span>
               <div>
-                <p className="text-sm font-semibold uppercase tracking-wide text-white/75">SmartEdu course</p>
                 <p className="mt-2 text-4xl font-black leading-tight">{course.title}</p>
               </div>
             </div>

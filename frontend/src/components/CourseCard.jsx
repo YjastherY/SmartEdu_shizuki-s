@@ -15,7 +15,8 @@ export default function CourseCard({ course }) {
           <img
             className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
             src={imageUrl}
-            alt={course.title}
+            alt=""
+            aria-hidden="true"
             onError={() => setImageFailed(true)}
           />
         ) : (
