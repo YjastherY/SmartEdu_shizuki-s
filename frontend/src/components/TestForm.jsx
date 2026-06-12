@@ -1,5 +1,5 @@
 import { Award, Clock, Medal, RotateCcw, Timer } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../services/api.js";
 
 export default function TestForm({ test, onSubmitted }) {
@@ -9,6 +9,8 @@ export default function TestForm({ test, onSubmitted }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState((test?.timeLimitMinutes || 0) * 60);
+  const [endAt, setEndAt] = useState(null);
+  const submitLock = useRef(false);
 
   if (!test) {
     return null;
@@ -23,52 +25,107 @@ export default function TestForm({ test, onSubmitted }) {
   const canStart = !deadlinePassed && (attemptsLeft === null || attemptsLeft > 0);
   const totalPoints = test.questions.reduce((sum, question) => sum + getQuestionPoints(question), 0);
   const answeredAll = test.questions.every((question) => hasAnswer(question, answers[question.id]));
+  const sessionKey = useMemo(() => (test?.id ? `smartedu-test-session:${test.id}` : ""), [test?.id]);
 
   useEffect(() => {
-    if (!started || !test.timeLimitMinutes) return;
+    if (!test?.id) return;
+    const session = readTestSession(sessionKey);
+    submitLock.current = false;
+
+    if (session?.answers) setAnswers(session.answers);
+
+    if (test.timeLimitMinutes && session?.endAt) {
+      const nextSeconds = Math.max(Math.ceil((session.endAt - Date.now()) / 1000), 0);
+      setEndAt(session.endAt);
+      setSecondsLeft(nextSeconds);
+      setStarted(true);
+      if (nextSeconds === 0) setError("Время вышло. Отправляем сохранённые ответы.");
+      return;
+    }
+
+    setEndAt(null);
+    setSecondsLeft((test.timeLimitMinutes || 0) * 60);
+  }, [test?.id, sessionKey, test?.timeLimitMinutes]);
+
+  useEffect(() => {
+    if (!started || !test.timeLimitMinutes || !endAt) return undefined;
 
     const timer = window.setInterval(() => {
-      setSecondsLeft((value) => Math.max(value - 1, 0));
+      setSecondsLeft(Math.max(Math.ceil((endAt - Date.now()) / 1000), 0));
     }, 1000);
 
     return () => window.clearInterval(timer);
-  }, [started, test.timeLimitMinutes]);
+  }, [started, test.timeLimitMinutes, endAt]);
 
   useEffect(() => {
-    if (started && secondsLeft === 0) {
-      setError("Время вышло. Попытку нужно начать заново.");
-      setStarted(false);
-      setAnswers({});
+    if (!started || !sessionKey) return;
+    const session = readTestSession(sessionKey) || {};
+    writeTestSession(sessionKey, {
+      ...session,
+      answers,
+      endAt: endAt || session.endAt || null
+    });
+  }, [answers, started, endAt, sessionKey]);
+
+  useEffect(() => {
+    if (started && test.timeLimitMinutes && secondsLeft === 0 && !submitLock.current) {
+      setError("Время вышло. Отправляем сохранённые ответы.");
+      submitTest(answers);
     }
   }, [started, secondsLeft]);
 
   async function handleSubmit(event) {
     event.preventDefault();
+    await submitTest(answers);
+  }
+
+  async function submitTest(nextAnswers) {
+    if (submitLock.current) return;
+    submitLock.current = true;
     setLoading(true);
     setError("");
     try {
       const data = await api(`/tests/${test.id}/submit`, {
         method: "POST",
-        body: JSON.stringify({ answers })
+        body: JSON.stringify({ answers: nextAnswers || {} })
       });
       setResult(data);
       onSubmitted?.(data);
       setStarted(false);
       setAnswers({});
       setSecondsLeft((test.timeLimitMinutes || 0) * 60);
+      setEndAt(null);
+      if (sessionKey) localStorage.removeItem(sessionKey);
     } catch (err) {
       setError(err.message);
+      submitLock.current = false;
     } finally {
       setLoading(false);
     }
   }
 
   function startTest() {
+    const existing = readTestSession(sessionKey);
+    const existingEnd = existing?.endAt || null;
+
+    if (test.timeLimitMinutes && existingEnd) {
+      const remaining = Math.max(Math.ceil((existingEnd - Date.now()) / 1000), 0);
+      setAnswers(existing.answers || {});
+      setEndAt(existingEnd);
+      setSecondsLeft(remaining);
+      setStarted(true);
+      setError(remaining === 0 ? "Время вышло. Отправляем сохранённые ответы." : "");
+      return;
+    }
+
+    const nextEndAt = test.timeLimitMinutes ? Date.now() + test.timeLimitMinutes * 60 * 1000 : null;
     setStarted(true);
     setError("");
     setResult(null);
     setAnswers({});
     setSecondsLeft((test.timeLimitMinutes || 0) * 60);
+    setEndAt(nextEndAt);
+    if (sessionKey) writeTestSession(sessionKey, { answers: {}, endAt: nextEndAt });
   }
 
   const timeLabel = useMemo(() => {
@@ -137,7 +194,7 @@ export default function TestForm({ test, onSubmitted }) {
         </fieldset>
       ))}
       {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-950 dark:text-red-200">{error}</p>}
-      <button className="btn-primary" disabled={loading || !answeredAll}>
+      <button className="btn-primary" disabled={loading || (!answeredAll && secondsLeft > 0)}>
         {loading ? "Проверяем..." : "Отправить тест"}
       </button>
     </form>
@@ -274,6 +331,21 @@ function getQuestionPoints(question) {
 function getBestScore(attempts) {
   const graded = attempts.filter((attempt) => attempt.status !== "PENDING_REVIEW");
   return graded.length ? Math.max(...graded.map((attempt) => attempt.score)) : null;
+}
+
+function readTestSession(key) {
+  if (!key) return null;
+  try {
+    const session = localStorage.getItem(key);
+    return session ? JSON.parse(session) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeTestSession(key, session) {
+  if (!key) return;
+  localStorage.setItem(key, JSON.stringify(session));
 }
 
 function hasAnswer(question, value) {

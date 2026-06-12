@@ -6,6 +6,7 @@ const items = [
   { to: "/dashboard", label: "Главная", icon: LayoutDashboard },
   { to: "/courses", label: "Курсы", icon: BookOpen },
   { to: "/grades", label: "Оценки", icon: ClipboardList },
+  { to: "/teacher", label: "Проверка", icon: UsersRound, roles: ["TEACHER", "ADMIN"] },
   { to: "/chat", label: "Чат", icon: MessageCircle },
   { to: "/progress", label: "Прогресс", icon: BarChart3 },
   { to: "/profile", label: "Профиль", icon: User }
@@ -14,9 +15,8 @@ const items = [
 export default function Sidebar({ open, onClose }) {
   const { user } = useAuth();
   const visibleItems = [
-    ...items,
+    ...items.filter((item) => !item.roles || item.roles.includes(user?.role)),
     ...(user?.role === "TEACHER" || user?.role === "ADMIN" ? [{ to: "/courses/builder", label: "Конструктор", icon: BookOpen }] : []),
-    ...(user?.role === "TEACHER" || user?.role === "ADMIN" ? [{ to: "/teacher", label: "Проверка", icon: UsersRound }] : []),
     ...(user?.role === "ADMIN" ? [{ to: "/admin", label: "Администрирование", icon: ShieldCheck }] : [])
   ];
 

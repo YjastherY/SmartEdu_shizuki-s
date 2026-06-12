@@ -126,13 +126,13 @@ export default function TeacherPanel() {
     }
   }
 
-  async function gradeSubmission(id) {
+  async function gradeSubmission(id, draftOverride = null) {
     const submission = data.manualSubmissions.find((item) => item.id === id);
     const payload = {
       score: submission?.score ?? 0,
       autoScore: submission?.autoScore ?? 0,
       feedback: submission?.feedback || "",
-      ...(grade[id] || {})
+      ...(draftOverride || grade[id] || {})
     };
     const result = await api(`/teacher/submissions/${id}/grade`, {
       method: "PATCH",
@@ -623,7 +623,7 @@ function ReviewWorkspace({
         </div>
         <div className="grid gap-3 xl:grid-cols-2">
           {pending.map((item) => (
-            <SubmissionCard key={item.id} item={item} grade={grade} setGrade={setGrade} gradeSubmission={gradeSubmission} compact autoSave />
+            <SubmissionCard key={item.id} item={item} grade={grade} setGrade={setGrade} gradeSubmission={gradeSubmission} compact />
           ))}
           {pending.length === 0 && <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-800">Сейчас всё проверено.</p>}
         </div>
@@ -718,7 +718,7 @@ function ReviewWorkspace({
 
             <div>
               {selectedWork?.type === "submission" ? (
-                <SubmissionCard item={selectedWork.submission} grade={grade} setGrade={setGrade} gradeSubmission={gradeSubmission} autoSave />
+                <SubmissionCard item={selectedWork.submission} grade={grade} setGrade={setGrade} gradeSubmission={gradeSubmission} />
               ) : selectedWork ? (
                 <WorkSummaryCard work={selectedWork} />
               ) : (
@@ -914,10 +914,10 @@ function ReviewTab({ submissions, pending, grade, setGrade, gradeSubmission }) {
   );
 }
 
-function SubmissionCard({ item, grade, setGrade, gradeSubmission, compact = false, autoSave = false }) {
+function SubmissionCard({ item, grade, setGrade, gradeSubmission, compact = false }) {
   const [editing, setEditing] = useState(item.status === "PENDING");
-  const [autoSaveState, setAutoSaveState] = useState("");
-  const currentGrade = grade[item.id] || {};
+  const [draftState, setDraftState] = useState("");
+  const currentGrade = grade[item.id] || readGradeDraft(item.id) || {};
   const score = currentGrade.score ?? item.score ?? "";
   const autoScore = currentGrade.autoScore ?? item.autoScore ?? 0;
   const feedback = currentGrade.feedback ?? item.feedback ?? "";
@@ -926,27 +926,27 @@ function SubmissionCard({ item, grade, setGrade, gradeSubmission, compact = fals
   const manualAnswers = getManualAnswers(item);
 
   function updateGrade(patch) {
-    setAutoSaveState("Сохраняем...");
-    setGrade({ ...grade, [item.id]: { ...currentGrade, ...patch } });
+    const nextDraft = { ...currentGrade, ...patch };
+    setGrade({ ...grade, [item.id]: nextDraft });
+    saveGradeDraft(item.id, nextDraft);
+    setDraftState("Черновик сохранён");
   }
 
   function beginEdit() {
-    setGrade({ ...grade, [item.id]: { score: item.score ?? 0, feedback: item.feedback || "" } });
+    const nextDraft = { score: item.score ?? 0, autoScore: item.autoScore ?? 0, feedback: item.feedback || "" };
+    setGrade({ ...grade, [item.id]: nextDraft });
+    saveGradeDraft(item.id, nextDraft);
+    setDraftState("Черновик сохранён");
     setEditing(true);
   }
 
-  async function saveGrade(keepEditing = false) {
-    setAutoSaveState("Сохраняем...");
-    await gradeSubmission(item.id);
-    setAutoSaveState("Сохранено");
-    if (!keepEditing) setEditing(false);
+  async function saveGrade() {
+    setDraftState("Отправляем оценку...");
+    await gradeSubmission(item.id, { score: Number(score || 0), autoScore: Number(autoScore || 0), feedback });
+    removeGradeDraft(item.id);
+    setDraftState("Оценка сохранена");
+    setEditing(false);
   }
-
-  useEffect(() => {
-    if (!autoSave || !editing || (!("score" in currentGrade) && !("feedback" in currentGrade))) return undefined;
-    const timer = setTimeout(() => saveGrade(true), 900);
-    return () => clearTimeout(timer);
-  }, [autoSave, editing, currentGrade.score, currentGrade.feedback]);
 
   return (
     <div className="rounded-lg bg-slate-50 p-4 dark:bg-slate-800">
@@ -1022,9 +1022,9 @@ function SubmissionCard({ item, grade, setGrade, gradeSubmission, compact = fals
           </label>
           <textarea className="input mt-3 min-h-24" placeholder="Комментарий к оценке" value={feedback} onChange={(event) => updateGrade({ feedback: event.target.value })} />
           <div className="mt-3 flex justify-end gap-2">
-            {autoSaveState && <span className="self-center text-sm text-slate-500">{autoSaveState}</span>}
+            {draftState && <span className="self-center text-sm text-slate-500">{draftState}</span>}
             {item.status === "GRADED" && <button className="btn-secondary" onClick={() => setEditing(false)}>Отмена</button>}
-            <button className="btn-primary" onClick={() => saveGrade()}>Сохранить оценку</button>
+            <button className="btn-primary" onClick={saveGrade}>Выставить оценку</button>
           </div>
         </div>
       )}
@@ -1037,6 +1037,27 @@ function getManualAnswers(item) {
   if (item.question) return [{ question: item.question, answer: item.answer }];
   const [firstLine, ...rest] = String(item.answer || "").split("\n");
   return [{ question: firstLine || "Развернутый ответ", answer: rest.join("\n").trim() || item.answer }];
+}
+
+function gradeDraftKey(id) {
+  return `smartedu-grade-draft:${id}`;
+}
+
+function readGradeDraft(id) {
+  try {
+    const draft = localStorage.getItem(gradeDraftKey(id));
+    return draft ? JSON.parse(draft) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveGradeDraft(id, draft) {
+  localStorage.setItem(gradeDraftKey(id), JSON.stringify(draft));
+}
+
+function removeGradeDraft(id) {
+  localStorage.removeItem(gradeDraftKey(id));
 }
 
 function ProgressTab({ groups, selectedGroupId, selectedStudentId, selectedGroup, selectedStudent, setSelectedGroupId, setSelectedStudentId, extendDeadline }) {
