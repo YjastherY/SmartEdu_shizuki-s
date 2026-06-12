@@ -31,6 +31,7 @@ const testSchema = z.object({
 
 const gradeSchema = z.object({
   score: z.number().min(0),
+  autoScore: z.number().min(0).optional(),
   feedback: z.string().optional().or(z.literal(""))
 });
 
@@ -329,11 +330,12 @@ router.patch(
     if (!submission) return res.status(404).json({ message: "Submission not found" });
 
     const manualScore = Math.min(data.score, submission.maxScore);
+    const autoScore = Math.min(data.autoScore ?? submission.attempt.autoScore, submission.attempt.totalPoints);
     const siblings = await prisma.manualSubmission.findMany({
       where: { attemptId: submission.attemptId, id: { not: submission.id } }
     });
     const manualTotal = siblings.reduce((sum, item) => sum + (item.score || 0), manualScore);
-    const earnedPoints = submission.attempt.autoScore + manualTotal;
+    const earnedPoints = autoScore + manualTotal;
     const finalScore = submission.attempt.totalPoints ? Math.round((earnedPoints / submission.attempt.totalPoints) * 100) : 0;
     const allManualGraded = siblings.every((item) => item.status === "GRADED");
 
@@ -352,6 +354,7 @@ router.patch(
         where: { id: submission.attemptId },
         data: {
           manualScore: manualTotal,
+          autoScore,
           earnedPoints,
           score: finalScore,
           status: "GRADED"
@@ -368,7 +371,7 @@ router.patch(
     });
     sendNotification(submission.userId, notification);
 
-    res.json({ submission: { ...updated, finalScore: allManualGraded ? finalScore : null } });
+    res.json({ submission: { ...updated, autoScore, finalScore: allManualGraded ? finalScore : null } });
   })
 );
 

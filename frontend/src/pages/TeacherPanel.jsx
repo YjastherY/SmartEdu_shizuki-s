@@ -19,7 +19,6 @@ const emptyQuestion = {
 };
 
 export default function TeacherPanel() {
-  const [activeTab, setActiveTab] = useState("review");
   const [data, setData] = useState(null);
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [selectedStudentId, setSelectedStudentId] = useState("");
@@ -98,7 +97,7 @@ export default function TeacherPanel() {
     [courses]
   );
 
-  if (!data) return <div className="panel text-sm text-slate-500">Загружаем кабинет преподавателя...</div>;
+  if (!data) return <div className="panel text-sm text-slate-500">Загружаем раздел проверки...</div>;
 
   async function saveTest(event) {
     event.preventDefault();
@@ -128,9 +127,16 @@ export default function TeacherPanel() {
   }
 
   async function gradeSubmission(id) {
+    const submission = data.manualSubmissions.find((item) => item.id === id);
+    const payload = {
+      score: submission?.score ?? 0,
+      autoScore: submission?.autoScore ?? 0,
+      feedback: submission?.feedback || "",
+      ...(grade[id] || {})
+    };
     const result = await api(`/teacher/submissions/${id}/grade`, {
       method: "PATCH",
-      body: JSON.stringify(grade[id] || {})
+      body: JSON.stringify(payload)
     });
     setData((value) => ({
       ...value,
@@ -224,11 +230,11 @@ export default function TeacherPanel() {
     <div className="page-enter space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Кабинет преподавателя</h1>
-          <p className="text-sm text-slate-500">Проверка работ, тесты, конструктор курсов и аналитика по группам.</p>
+          <h1 className="text-2xl font-bold">Проверка работ</h1>
+          <p className="text-sm text-slate-500">Новые ответы, группы и история работ учеников.</p>
         </div>
         <Link className="btn-primary flex w-fit items-center gap-2" to="/courses/builder">
-          <BookOpen size={18} /> Открыть конструктор
+          <BookOpen size={18} /> Конструктор курсов
         </Link>
       </div>
 
@@ -236,76 +242,27 @@ export default function TeacherPanel() {
         <Stat icon={BookOpen} label="Курсы" value={courses.length} />
         <Stat icon={UsersRound} label="Группы" value={data.groups.length} />
         <Stat icon={ClipboardCheck} label="К проверке" value={pending.length} />
-        <Stat icon={CheckCircle2} label="Тесты" value={data.customTests.length} />
+        <Stat icon={CheckCircle2} label="Проверено" value={data.manualSubmissions.filter((item) => item.status === "GRADED").length} />
       </section>
 
-      <div className="flex gap-2 overflow-x-auto rounded-lg border border-slate-200 bg-white p-1 dark:border-slate-800 dark:bg-slate-900">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            className={`rounded-md px-4 py-2 text-sm font-semibold transition ${activeTab === tab.id ? "bg-brand-600 text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"}`}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {activeTab === "create" && (
-        <TestEditor
-          courses={courses}
-          draft={draft}
-          saved={saved}
-          savingTest={savingTest}
-          questionSummary={questionSummary}
-          setDraft={setDraft}
-          saveTest={saveTest}
-          updateQuestion={updateQuestion}
-        />
-      )}
-
-      {activeTab === "materials" && (
-        <MaterialsTab
-          modules={modules}
-          lessons={materialLessons}
-          videoLessons={videoLessons}
-          videoState={videoState}
-          setVideoState={setVideoState}
-          uploadLessonVideo={uploadLessonVideo}
-          activityDraft={activityDraft}
-          setActivityDraft={setActivityDraft}
-          activityMessage={activityMessage}
-          saveActivity={saveActivity}
-          refreshTeacherData={async () => setData(await api("/teacher/overview"))}
-        />
-      )}
-
-      {activeTab === "review" && (
-        <ReviewTab
-          submissions={data.manualSubmissions}
-          pending={pending}
-          grade={grade}
-          setGrade={setGrade}
-          gradeSubmission={gradeSubmission}
-        />
-      )}
-
-      {activeTab === "progress" && (
-        <ProgressTab
-          groups={data.groups}
-          selectedGroupId={selectedGroupId}
-          selectedStudentId={selectedStudentId}
-          selectedGroup={selectedGroup}
-          selectedStudent={selectedStudent}
-          setSelectedGroupId={(id) => {
-            const group = data.groups.find((item) => item.id === id);
-            setSelectedGroupId(id);
-            setSelectedStudentId(group?.students[0]?.id || "");
-          }}
-          setSelectedStudentId={setSelectedStudentId}
-          extendDeadline={extendDeadline}
-        />
-      )}
+      <ReviewWorkspace
+        groups={data.groups}
+        submissions={data.manualSubmissions}
+        pending={pending}
+        grade={grade}
+        setGrade={setGrade}
+        gradeSubmission={gradeSubmission}
+        selectedGroupId={selectedGroupId}
+        selectedStudentId={selectedStudentId}
+        selectedGroup={selectedGroup}
+        selectedStudent={selectedStudent}
+        setSelectedGroupId={(id) => {
+          const group = data.groups.find((item) => item.id === id);
+          setSelectedGroupId(id);
+          setSelectedStudentId(group?.students[0]?.id || "");
+        }}
+        setSelectedStudentId={setSelectedStudentId}
+      />
     </div>
   );
 }
@@ -620,6 +577,155 @@ function VisibilityBadge({ item }) {
   return <span className={`w-fit rounded-full px-2 py-1 text-xs font-semibold ${className}`}>{label}</span>;
 }
 
+function ReviewWorkspace({
+  groups,
+  submissions,
+  pending,
+  grade,
+  setGrade,
+  gradeSubmission,
+  selectedGroupId,
+  selectedStudentId,
+  selectedGroup,
+  selectedStudent,
+  setSelectedGroupId,
+  setSelectedStudentId
+}) {
+  const [courseFilter, setCourseFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sort, setSort] = useState("newest");
+  const [selectedSubmissionId, setSelectedSubmissionId] = useState("");
+  const studentSubmissions = submissions.filter((item) => item.student?.id === selectedStudentId || item.studentId === selectedStudentId);
+  const courses = Array.from(new Set(studentSubmissions.map((item) => item.course?.title).filter(Boolean)));
+  const filteredSubmissions = studentSubmissions
+    .filter((item) => courseFilter === "all" || item.course?.title === courseFilter)
+    .filter((item) => statusFilter === "all" || item.status === statusFilter)
+    .sort((a, b) => {
+      if (sort === "status") return String(a.status).localeCompare(String(b.status), "ru");
+      const left = new Date(a.updatedAt || a.createdAt || 0).getTime();
+      const right = new Date(b.updatedAt || b.createdAt || 0).getTime();
+      return sort === "oldest" ? left - right : right - left;
+    });
+  const selectedSubmission = filteredSubmissions.find((item) => item.id === selectedSubmissionId) || filteredSubmissions[0];
+
+  useEffect(() => {
+    setSelectedSubmissionId(filteredSubmissions[0]?.id || "");
+  }, [selectedStudentId, courseFilter, statusFilter, sort]);
+
+  return (
+    <div className="space-y-6">
+      <section className="panel space-y-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-xl font-bold">Актуальные работы к проверке</h2>
+          <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-700 dark:bg-amber-950 dark:text-amber-100">
+            {pending.length}
+          </span>
+        </div>
+        <div className="grid gap-3 xl:grid-cols-2">
+          {pending.map((item) => (
+            <SubmissionCard key={item.id} item={item} grade={grade} setGrade={setGrade} gradeSubmission={gradeSubmission} compact autoSave />
+          ))}
+          {pending.length === 0 && <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-800">Сейчас всё проверено.</p>}
+        </div>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[320px_1fr]">
+        <aside className="panel space-y-5">
+          <div>
+            <h2 className="mb-3 font-bold">Группы</h2>
+            <div className="space-y-2">
+              {groups.map((group) => (
+                <button
+                  key={group.id}
+                  className={`w-full rounded-lg border p-3 text-left transition ${selectedGroupId === group.id ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-100" : "border-slate-200 hover:border-brand-300 dark:border-slate-700"}`}
+                  onClick={() => setSelectedGroupId(group.id)}
+                >
+                  <span className="block font-semibold">{group.title}</span>
+                  <span className="text-sm text-slate-500">{group.students.length} учеников</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <h2 className="mb-3 font-bold">Ученики</h2>
+            <div className="space-y-2">
+              {selectedGroup?.students.map((student) => (
+                <button
+                  key={student.id}
+                  className={`w-full rounded-lg px-3 py-2 text-left text-sm transition ${selectedStudentId === student.id ? "bg-brand-600 text-white" : "bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700"}`}
+                  onClick={() => setSelectedStudentId(student.id)}
+                >
+                  <span className="block font-semibold">{student.name}</span>
+                  <span className="text-xs opacity-80">{student.pending} на проверке</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </aside>
+
+        <main className="space-y-5">
+          <div className="panel">
+            {selectedStudent ? (
+              <div className="space-y-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <h2 className="text-xl font-bold">{selectedStudent.name}</h2>
+                    <p className="text-sm text-slate-500">{selectedStudent.email} • {selectedStudent.group}</p>
+                  </div>
+                  <Link className="btn-secondary" to="/grades">Открыть журнал оценок</Link>
+                </div>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <select className="input" value={courseFilter} onChange={(event) => setCourseFilter(event.target.value)}>
+                    <option value="all">Все курсы</option>
+                    {courses.map((course) => <option key={course} value={course}>{course}</option>)}
+                  </select>
+                  <select className="input" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                    <option value="all">Все статусы</option>
+                    <option value="PENDING">Непроверенные</option>
+                    <option value="GRADED">Проверенные</option>
+                  </select>
+                  <select className="input" value={sort} onChange={(event) => setSort(event.target.value)}>
+                    <option value="newest">Сначала новые</option>
+                    <option value="oldest">Сначала старые</option>
+                    <option value="status">По статусу</option>
+                  </select>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500">Выберите ученика.</p>
+            )}
+          </div>
+
+          <div className="grid gap-5 2xl:grid-cols-[340px_1fr]">
+            <div className="panel space-y-3">
+              <h3 className="font-bold">Работы ученика</h3>
+              {filteredSubmissions.map((item) => (
+                <button
+                  key={item.id}
+                  className={`w-full rounded-lg border p-3 text-left transition ${selectedSubmission?.id === item.id ? "border-brand-500 bg-brand-50 dark:bg-brand-950" : "border-slate-200 hover:border-brand-300 dark:border-slate-700"}`}
+                  onClick={() => setSelectedSubmissionId(item.id)}
+                >
+                  <span className="block font-semibold">{item.testTitle}</span>
+                  <span className="text-sm text-slate-500">{item.course?.title} • {item.status === "PENDING" ? "на проверке" : "проверено"}</span>
+                </button>
+              ))}
+              {filteredSubmissions.length === 0 && <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-800">Работ по фильтрам нет.</p>}
+            </div>
+
+            <div>
+              {selectedSubmission ? (
+                <SubmissionCard item={selectedSubmission} grade={grade} setGrade={setGrade} gradeSubmission={gradeSubmission} autoSave />
+              ) : (
+                <div className="panel text-sm text-slate-500">Выберите работу, чтобы открыть ответы.</div>
+              )}
+            </div>
+          </div>
+        </main>
+      </section>
+    </div>
+  );
+}
+
 function ReviewTab({ submissions, pending, grade, setGrade, gradeSubmission }) {
   const [mode, setMode] = useState("pending");
   const [groupId, setGroupId] = useState("all");
@@ -704,16 +810,19 @@ function ReviewTab({ submissions, pending, grade, setGrade, gradeSubmission }) {
   );
 }
 
-function SubmissionCard({ item, grade, setGrade, gradeSubmission, compact = false }) {
+function SubmissionCard({ item, grade, setGrade, gradeSubmission, compact = false, autoSave = false }) {
   const [editing, setEditing] = useState(item.status === "PENDING");
+  const [autoSaveState, setAutoSaveState] = useState("");
   const currentGrade = grade[item.id] || {};
   const score = currentGrade.score ?? item.score ?? "";
+  const autoScore = currentGrade.autoScore ?? item.autoScore ?? 0;
   const feedback = currentGrade.feedback ?? item.feedback ?? "";
   const maxScore = Number(item.maxScore || 100);
   const quickScores = [0.5, 0.75, 0.9, 1].map((value) => Math.round(maxScore * value));
   const manualAnswers = getManualAnswers(item);
 
   function updateGrade(patch) {
+    setAutoSaveState("Сохраняем...");
     setGrade({ ...grade, [item.id]: { ...currentGrade, ...patch } });
   }
 
@@ -722,10 +831,18 @@ function SubmissionCard({ item, grade, setGrade, gradeSubmission, compact = fals
     setEditing(true);
   }
 
-  async function saveGrade() {
+  async function saveGrade(keepEditing = false) {
+    setAutoSaveState("Сохраняем...");
     await gradeSubmission(item.id);
-    setEditing(false);
+    setAutoSaveState("Сохранено");
+    if (!keepEditing) setEditing(false);
   }
+
+  useEffect(() => {
+    if (!autoSave || !editing || (!("score" in currentGrade) && !("feedback" in currentGrade))) return undefined;
+    const timer = setTimeout(() => saveGrade(true), 900);
+    return () => clearTimeout(timer);
+  }, [autoSave, editing, currentGrade.score, currentGrade.feedback]);
 
   return (
     <div className="rounded-lg bg-slate-50 p-4 dark:bg-slate-800">
@@ -749,7 +866,7 @@ function SubmissionCard({ item, grade, setGrade, gradeSubmission, compact = fals
       </div>
       {!compact && (
         <div className="mt-3 space-y-2">
-          <p className="text-sm font-semibold">Ответы в других вопросах</p>
+          <p className="text-sm font-semibold">Автопроверка</p>
           {item.answers.map((answer) => (
             <div key={answer.question} className="rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-700">
               <p className="font-medium">{answer.question}</p>
@@ -784,14 +901,26 @@ function SubmissionCard({ item, grade, setGrade, gradeSubmission, compact = fals
           <div className="grid gap-3 sm:grid-cols-[1fr_130px]">
             <input className="w-full accent-brand-600" type="range" min="0" max={maxScore} value={score || 0} onChange={(event) => updateGrade({ score: Number(event.target.value) })} />
             <label className="flex items-center gap-2">
-              <input className="input" type="number" min="0" max={maxScore} placeholder="Балл" value={score} onChange={(event) => updateGrade({ score: event.target.value })} />
+              <input className="input" type="number" min="0" max={maxScore} placeholder="Балл" value={score} onChange={(event) => updateGrade({ score: Number(event.target.value) })} />
               <span className="text-sm text-slate-500">из {maxScore}</span>
             </label>
           </div>
+          <label className="mt-3 block text-sm font-medium">
+            Баллы автопроверки
+            <input
+              className="input mt-1"
+              type="number"
+              min="0"
+              max={item.totalPoints || 100}
+              value={autoScore}
+              onChange={(event) => updateGrade({ autoScore: Number(event.target.value) })}
+            />
+          </label>
           <textarea className="input mt-3 min-h-24" placeholder="Комментарий к оценке" value={feedback} onChange={(event) => updateGrade({ feedback: event.target.value })} />
           <div className="mt-3 flex justify-end gap-2">
+            {autoSaveState && <span className="self-center text-sm text-slate-500">{autoSaveState}</span>}
             {item.status === "GRADED" && <button className="btn-secondary" onClick={() => setEditing(false)}>Отмена</button>}
-            <button className="btn-primary" onClick={saveGrade}>Сохранить оценку</button>
+            <button className="btn-primary" onClick={() => saveGrade()}>Сохранить оценку</button>
           </div>
         </div>
       )}

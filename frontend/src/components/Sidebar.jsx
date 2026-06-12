@@ -16,7 +16,7 @@ export default function Sidebar({ open, onClose }) {
   const visibleItems = [
     ...items,
     ...(user?.role === "TEACHER" || user?.role === "ADMIN" ? [{ to: "/courses/builder", label: "Конструктор", icon: BookOpen }] : []),
-    ...(user?.role === "TEACHER" || user?.role === "ADMIN" ? [{ to: "/teacher", label: "Преподаватель", icon: UsersRound }] : []),
+    ...(user?.role === "TEACHER" || user?.role === "ADMIN" ? [{ to: "/teacher", label: "Проверка", icon: UsersRound }] : []),
     ...(user?.role === "ADMIN" ? [{ to: "/admin", label: "Администрирование", icon: ShieldCheck }] : [])
   ];
 
