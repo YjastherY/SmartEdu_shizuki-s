@@ -3,7 +3,7 @@ import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 
 const items = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/dashboard", label: "Главная", icon: LayoutDashboard },
   { to: "/courses", label: "Курсы", icon: BookOpen },
   { to: "/assistant", label: "Помощник", icon: Bot },
   { to: "/chat", label: "Чат", icon: MessageCircle },
@@ -16,7 +16,7 @@ export default function Sidebar({ open, onClose }) {
   const visibleItems = [
     ...items,
     ...(user?.role === "TEACHER" || user?.role === "ADMIN" ? [{ to: "/teacher", label: "Преподаватель", icon: UsersRound }] : []),
-    ...(user?.role === "ADMIN" ? [{ to: "/admin", label: "Админ", icon: ShieldCheck }] : [])
+    ...(user?.role === "ADMIN" ? [{ to: "/admin", label: "Администрирование", icon: ShieldCheck }] : [])
   ];
 
   return (
@@ -36,7 +36,7 @@ export default function Sidebar({ open, onClose }) {
           </div>
           <div>
             <p className="text-lg font-bold">SmartEdu</p>
-            <p className="text-xs text-slate-500">Learning platform</p>
+            <p className="text-xs text-slate-500">Обучение онлайн</p>
           </div>
         </div>
         <nav className="space-y-2">

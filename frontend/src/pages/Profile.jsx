@@ -71,7 +71,7 @@ export default function Profile() {
         <h1 className="mt-4 text-2xl font-bold">{user.name}</h1>
         <p className="text-sm text-slate-500">{user.email}</p>
         <span className="mt-4 inline-flex rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 dark:bg-brand-950 dark:text-brand-100">
-          {user.role}
+          {roleLabel(user.role)}
         </span>
       </aside>
       <form className="panel space-y-4 hover:shadow-md" onSubmit={handleSubmit}>
@@ -103,4 +103,13 @@ export default function Profile() {
       </form>
     </div>
   );
+}
+
+function roleLabel(role) {
+  const labels = {
+    STUDENT: "Студент",
+    TEACHER: "Преподаватель",
+    ADMIN: "Администратор"
+  };
+  return labels[role] || "Пользователь";
 }
