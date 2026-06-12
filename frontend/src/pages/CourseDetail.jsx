@@ -8,10 +8,16 @@ export default function CourseDetail() {
   const [course, setCourse] = useState(null);
   const [error, setError] = useState("");
   const [imageFailed, setImageFailed] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   useEffect(() => {
     api(`/courses/${courseId}`).then((data) => setCourse(data.course)).catch((err) => setError(err.message));
   }, [courseId]);
+
+  useEffect(() => {
+    setImageFailed(false);
+    setImageLoaded(false);
+  }, [course?.imageUrl]);
 
   if (error) {
     return <div className="panel text-red-600">{error}</div>;
@@ -24,23 +30,24 @@ export default function CourseDetail() {
   return (
     <div className="page-enter space-y-6">
       <section className="polished-card group">
-        <div className="h-64 overflow-hidden">
-          {course.imageUrl && !imageFailed ? (
+        <div className="relative h-64 overflow-hidden bg-gradient-to-br from-brand-600 via-sky-500 to-cyan-400">
+          {course.imageUrl && !imageFailed && (
             <img
-              className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
+              className={`absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-105 ${imageLoaded ? "opacity-55" : "opacity-0"}`}
               src={assetUrl(course.imageUrl)}
               alt=""
               aria-hidden="true"
+              onLoad={() => setImageLoaded(true)}
               onError={() => setImageFailed(true)}
             />
-          ) : (
-            <div className="flex h-full w-full flex-col justify-between bg-gradient-to-br from-brand-600 via-sky-500 to-cyan-400 p-6 text-white transition duration-700 group-hover:scale-105">
-              <span className="w-fit rounded-full bg-white/20 px-3 py-1 text-xs font-bold backdrop-blur">{course.category}</span>
-              <div>
-                <p className="mt-2 text-4xl font-black leading-tight">{course.title}</p>
-              </div>
-            </div>
           )}
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/40 via-transparent to-transparent" />
+          <div className="relative flex h-full w-full flex-col justify-between p-6 text-white transition duration-700 group-hover:scale-105">
+            <span className="w-fit rounded-full bg-white/20 px-3 py-1 text-xs font-bold backdrop-blur">{course.category}</span>
+            <div>
+              <p className="mt-2 text-4xl font-black leading-tight">{course.title}</p>
+            </div>
+          </div>
         </div>
         <div className="p-6">
           <div className="mb-3 flex flex-wrap gap-2 text-xs">
