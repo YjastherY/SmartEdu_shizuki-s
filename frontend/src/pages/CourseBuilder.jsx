@@ -7,6 +7,14 @@ import { api, assetUrl } from "../services/api.js";
 
 const blockPrefix = "smartedu-blocks:";
 
+function makeId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `id-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 const emptyQuestion = {
   type: "SINGLE_CHOICE",
   text: "",
@@ -18,12 +26,12 @@ const emptyQuestion = {
 
 function emptyActivity(type = "TEXT") {
   return {
-    tempId: crypto.randomUUID(),
+    tempId: makeId(),
     type,
     title: "",
     duration: type === "TEST" ? "20 мин" : "10 мин",
     content: "",
-    textBlocks: [{ id: crypto.randomUUID(), type: "text", value: "" }],
+    textBlocks: [{ id: makeId(), type: "text", value: "" }],
     videoUrl: "",
     imageUrl: "",
     isPublished: true,
@@ -483,7 +491,7 @@ function TextFields({ activity, onChange }) {
   }
 
   function addBlock(type) {
-    onChange({ textBlocks: [...blocks, { id: crypto.randomUUID(), type, value: type === "link" ? "https://" : "" }] });
+    onChange({ textBlocks: [...blocks, { id: makeId(), type, value: type === "link" ? "https://" : "" }] });
   }
 
   function moveBlock(index, direction) {
