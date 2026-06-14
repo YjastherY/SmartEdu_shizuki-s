@@ -234,6 +234,7 @@ router.get(
       manualSubmissions: submissions.map((item) => ({
         id: item.id,
         studentId: item.userId,
+        attemptId: item.attemptId,
         testTitle: item.question.test.title,
         question: item.question.text,
         answer: item.answer,

@@ -144,6 +144,24 @@ export default function TeacherPanel() {
     }));
   }
 
+  function updateReviewedAttempt(attemptId, attempt, feedback = "") {
+    setData((value) => ({
+      ...value,
+      manualSubmissions: value.manualSubmissions.map((item) =>
+        item.attemptId === attemptId
+          ? {
+              ...item,
+              status: "GRADED",
+              finalScore: attempt.score,
+              autoScore: attempt.autoScore,
+              totalPoints: attempt.totalPoints,
+              feedback: feedback || item.feedback
+            }
+          : item
+      )
+    }));
+  }
+
   async function extendDeadline(studentId, assignmentId, deadline) {
     await api(`/teacher/students/${studentId}/extensions/${assignmentId}`, {
       method: "PATCH",
@@ -252,6 +270,7 @@ export default function TeacherPanel() {
         grade={grade}
         setGrade={setGrade}
         gradeSubmission={gradeSubmission}
+        onAttemptReviewed={updateReviewedAttempt}
         selectedGroupId={selectedGroupId}
         selectedStudentId={selectedStudentId}
         selectedGroup={selectedGroup}
@@ -589,7 +608,8 @@ function ReviewWorkspace({
   selectedGroup,
   selectedStudent,
   setSelectedGroupId,
-  setSelectedStudentId
+  setSelectedStudentId,
+  onAttemptReviewed
 }) {
   const [courseFilter, setCourseFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -623,7 +643,7 @@ function ReviewWorkspace({
         </div>
         <div className="grid gap-3 xl:grid-cols-2">
           {pending.map((item) => (
-            <SubmissionCard key={item.id} item={item} grade={grade} setGrade={setGrade} gradeSubmission={gradeSubmission} compact />
+            <SubmissionCard key={item.id} item={item} grade={grade} setGrade={setGrade} gradeSubmission={gradeSubmission} onAttemptReviewed={onAttemptReviewed} compact />
           ))}
           {pending.length === 0 && <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-800">Сейчас всё проверено.</p>}
         </div>
@@ -718,7 +738,7 @@ function ReviewWorkspace({
 
             <div>
               {selectedWork?.type === "submission" ? (
-                <SubmissionCard item={selectedWork.submission} grade={grade} setGrade={setGrade} gradeSubmission={gradeSubmission} />
+                <SubmissionCard item={selectedWork.submission} grade={grade} setGrade={setGrade} gradeSubmission={gradeSubmission} onAttemptReviewed={onAttemptReviewed} />
               ) : selectedWork ? (
                 <WorkSummaryCard work={selectedWork} />
               ) : (
@@ -1076,8 +1096,10 @@ function ReviewTab({ submissions, pending, grade, setGrade, gradeSubmission }) {
   );
 }
 
-function SubmissionCard({ item, grade, setGrade, gradeSubmission, compact = false }) {
-  const [editing, setEditing] = useState(item.status === "PENDING");
+function SubmissionCard({ item, grade, setGrade, gradeSubmission, onAttemptReviewed, compact = false }) {
+  const [editing, setEditing] = useState(item.status === "PENDING" && !item.attemptId);
+  const [attempt, setAttempt] = useState(null);
+  const [loadingAttempt, setLoadingAttempt] = useState(false);
   const [draftState, setDraftState] = useState("");
   const currentGrade = grade[item.id] || readGradeDraft(item.id) || {};
   const score = currentGrade.score ?? item.score ?? "";
@@ -1095,6 +1117,10 @@ function SubmissionCard({ item, grade, setGrade, gradeSubmission, compact = fals
   }
 
   function beginEdit() {
+    if (item.attemptId) {
+      openFullAttempt();
+      return;
+    }
     const nextDraft = { score: item.score ?? 0, autoScore: item.autoScore ?? 0, feedback: item.feedback || "" };
     setGrade({ ...grade, [item.id]: nextDraft });
     saveGradeDraft(item.id, nextDraft);
@@ -1107,6 +1133,53 @@ function SubmissionCard({ item, grade, setGrade, gradeSubmission, compact = fals
     await gradeSubmission(item.id, { score: Number(score || 0), autoScore: Number(autoScore || 0), feedback });
     removeGradeDraft(item.id);
     setDraftState("Оценка сохранена");
+    setEditing(false);
+  }
+
+  async function openFullAttempt() {
+    if (!item.attemptId) {
+      setEditing(true);
+      return;
+    }
+    setLoadingAttempt(true);
+    setDraftState("");
+    try {
+      const result = await api(`/teacher/attempts/${item.attemptId}`);
+      const nextScores = Object.fromEntries(result.attempt.questions.map((question) => [question.id, question.score ?? 0]));
+      const nextDraft = {
+        score: result.attempt.score,
+        autoScore: result.attempt.autoScore,
+        feedback: result.attempt.feedback || feedback || "",
+        questionScores: currentGrade.questionScores && Object.keys(currentGrade.questionScores).length ? currentGrade.questionScores : nextScores
+      };
+      setAttempt(result.attempt);
+      setGrade({ ...grade, [item.id]: nextDraft });
+      saveGradeDraft(item.id, nextDraft);
+      setEditing(true);
+    } catch (error) {
+      setDraftState(error.message || "Не удалось открыть полный тест");
+    } finally {
+      setLoadingAttempt(false);
+    }
+  }
+
+  async function saveFullAttempt() {
+    const questionScores = Object.fromEntries((attempt?.questions || []).map((question) => [question.id, currentGrade.questionScores?.[question.id] ?? question.score ?? 0]));
+    const earned = Object.values(questionScores).reduce((sum, value) => sum + Number(value || 0), 0);
+    const finalScore = attempt?.totalPoints ? Math.round((earned / attempt.totalPoints) * 100) : Number(currentGrade.score || 0);
+    setDraftState("Сохраняем перепроверку...");
+    const result = await api(`/teacher/attempts/${item.attemptId}/regrade`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        score: finalScore,
+        questionScores,
+        feedback: currentGrade.feedback || ""
+      })
+    });
+    removeGradeDraft(item.id);
+    setAttempt((value) => value ? { ...value, score: result.attempt.score, feedback: currentGrade.feedback || "" } : value);
+    onAttemptReviewed?.(item.attemptId, result.attempt, currentGrade.feedback || "");
+    setDraftState("Перепроверка сохранена");
     setEditing(false);
   }
 
@@ -1151,6 +1224,35 @@ function SubmissionCard({ item, grade, setGrade, gradeSubmission, compact = fals
             </div>
             <button className="btn-secondary bg-white/70 px-3 py-1 dark:bg-white/10" onClick={beginEdit}>Изменить</button>
           </div>
+        </div>
+      ) : item.attemptId ? (
+        <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+          {editing && attempt ? (
+            <>
+              <AttemptReviewEditor
+                attempt={attempt}
+                draft={currentGrade}
+                updateDraft={(patch) => updateGrade(patch)}
+              />
+              <textarea className="input mt-3 min-h-24" placeholder="Комментарий к перепроверке" value={feedback} onChange={(event) => updateGrade({ feedback: event.target.value })} />
+              <div className="mt-3 flex flex-wrap justify-end gap-2">
+                {draftState && <span className="self-center text-sm text-slate-500">{draftState}</span>}
+                <button className="btn-secondary" onClick={() => setEditing(false)}>Отмена</button>
+                <button className="btn-primary" onClick={saveFullAttempt}>Сохранить перепроверку</button>
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-semibold">Полная проверка теста</p>
+                <p className="text-sm text-slate-500 dark:text-slate-300">Откройте все вопросы ученика и поправьте баллы по заданиям.</p>
+                {draftState && <p className="mt-2 text-sm text-slate-500">{draftState}</p>}
+              </div>
+              <button className="btn-primary" onClick={openFullAttempt} disabled={loadingAttempt}>
+                {loadingAttempt ? "Открываем..." : "Открыть полный тест"}
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
