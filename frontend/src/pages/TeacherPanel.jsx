@@ -9,6 +9,9 @@ const tabs = [
   { id: "progress", label: "Успеваемость" }
 ];
 
+const videoTypes = ["video/mp4", "video/webm", "video/ogg", "video/quicktime"];
+const maxVideoSize = 200 * 1024 * 1024;
+
 const emptyQuestion = {
   type: "SINGLE_CHOICE",
   text: "",
@@ -184,6 +187,12 @@ export default function TeacherPanel() {
       return;
     }
 
+    const videoError = validateVideoFile(videoState.file);
+    if (videoError) {
+      setVideoState((value) => ({ ...value, message: videoError }));
+      return;
+    }
+
     const formData = new FormData();
     formData.append("video", videoState.file);
     setVideoState((value) => ({ ...value, uploading: true }));
@@ -284,6 +293,12 @@ export default function TeacherPanel() {
       />
     </div>
   );
+}
+
+function validateVideoFile(file) {
+  if (!videoTypes.includes(file.type)) return "Поддерживаются только MP4, WebM, OGG или MOV";
+  if (file.size > maxVideoSize) return "Видео должно быть меньше 200 МБ";
+  return "";
 }
 
 function normalizeTestDraft(draft) {

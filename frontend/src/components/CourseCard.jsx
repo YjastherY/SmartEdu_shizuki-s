@@ -1,5 +1,5 @@
 import { ArrowRight, Clock } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { assetUrl } from "../services/api.js";
 
@@ -8,10 +8,14 @@ export default function CourseCard({ course }) {
   const [imageFailed, setImageFailed] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const imageUrl = assetUrl(course.imageUrl);
+  const timerRef = useRef(null);
 
   useEffect(() => {
     setImageFailed(false);
     setImageLoaded(false);
+    if (!imageUrl) return undefined;
+    timerRef.current = window.setTimeout(() => setImageFailed(true), 2500);
+    return () => window.clearTimeout(timerRef.current);
   }, [imageUrl]);
 
   return (
@@ -23,7 +27,12 @@ export default function CourseCard({ course }) {
             src={imageUrl}
             alt=""
             aria-hidden="true"
-            onLoad={() => setImageLoaded(true)}
+            loading="lazy"
+            decoding="async"
+            onLoad={() => {
+              window.clearTimeout(timerRef.current);
+              setImageLoaded(true);
+            }}
             onError={() => setImageFailed(true)}
           />
         )}

@@ -6,6 +6,8 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { api, assetUrl } from "../services/api.js";
 
 const blockPrefix = "smartedu-blocks:";
+const videoTypes = ["video/mp4", "video/webm", "video/ogg", "video/quicktime"];
+const maxVideoSize = 200 * 1024 * 1024;
 
 function createId(prefix = "item") {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
@@ -162,6 +164,13 @@ export default function CourseBuilder() {
     setMessage("");
 
     try {
+      const videoError = validateActivities(activities);
+      if (videoError) {
+        setMessage(videoError);
+        setSaving(false);
+        return;
+      }
+
       const payload = {
         title: draft.title,
         description: draft.description,
@@ -736,6 +745,18 @@ function parseTextBlocks(content = "", imageUrl = "") {
 
 function firstImageUrl(blocks = []) {
   return blocks.find((block) => block.type === "image" && block.value)?.value || "";
+}
+
+function validateActivities(activities) {
+  const video = activities.find((activity) => activity.videoFile);
+  if (!video?.videoFile) return "";
+  if (!videoTypes.includes(video.videoFile.type)) {
+    return `Видео «${video.title || "без названия"}»: поддерживаются только MP4, WebM, OGG или MOV`;
+  }
+  if (video.videoFile.size > maxVideoSize) {
+    return `Видео «${video.title || "без названия"}» должно быть меньше 200 МБ`;
+  }
+  return "";
 }
 
 function normalizeQuestions(questions) {

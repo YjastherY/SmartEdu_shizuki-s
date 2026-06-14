@@ -1,4 +1,4 @@
-const videoUrl = "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4";
+const videoUrl = "";
 
 const initialState = {
   token: "mock-token",
@@ -89,7 +89,7 @@ const courses = [
     category: "Frontend",
     level: "Beginner",
     duration: "6 часов",
-    imageUrl: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80",
+    imageUrl: "",
     modules: [
       {
         id: "module-1",
@@ -181,7 +181,7 @@ const courses = [
     category: "Backend",
     level: "Intermediate",
     duration: "8 часов",
-    imageUrl: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1200&q=80",
+    imageUrl: "",
     modules: [
       {
         id: "module-3",
