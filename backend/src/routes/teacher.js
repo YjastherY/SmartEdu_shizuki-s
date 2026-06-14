@@ -116,8 +116,13 @@ async function buildStudentRow(student) {
     grades: attempts
       .filter((item) => item.status === "GRADED")
       .map((item) => ({
+        attemptId: item.id,
+        testId: item.testId,
         title: item.test.title,
         score: item.score,
+        autoScore: item.autoScore,
+        manualScore: item.manualScore,
+        totalPoints: item.totalPoints,
         details: [
           { label: "Автопроверка", value: `${item.autoScore} баллов` },
           ...(item.manualScore === null ? [] : [{ label: "Развернутый ответ", value: `${item.manualScore} баллов` }])
@@ -398,6 +403,56 @@ router.patch(
     sendNotification(req.params.studentId, notification);
 
     res.json({ extension });
+  })
+);
+
+router.patch(
+  "/teacher/attempts/:id/regrade",
+  authRequired,
+  teacherOrAdmin,
+  asyncHandler(async (req, res) => {
+    const data = z.object({
+      score: z.number().min(0).max(100),
+      autoScore: z.number().min(0).optional(),
+      feedback: z.string().optional().or(z.literal(""))
+    }).parse(req.body);
+    const attempt = await prisma.testAttempt.findUnique({
+      where: { id: req.params.id },
+      include: {
+        user: { include: { group: true } },
+        test: { include: { lesson: { include: { module: { include: { course: true } } } } } }
+      }
+    });
+
+    if (!attempt) return res.status(404).json({ message: "Attempt not found" });
+    if (req.user.role !== "ADMIN" && attempt.user.group?.teacherId !== req.user.id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const autoScore = data.autoScore == null ? attempt.autoScore : Math.min(data.autoScore, attempt.totalPoints);
+    const earnedPoints = Math.round((data.score / 100) * attempt.totalPoints);
+    const manualScore = Math.max(earnedPoints - autoScore, 0);
+    const updated = await prisma.testAttempt.update({
+      where: { id: attempt.id },
+      data: {
+        score: Math.round(data.score),
+        autoScore,
+        manualScore,
+        earnedPoints,
+        status: "GRADED"
+      }
+    });
+
+    const notification = await prisma.notification.create({
+      data: {
+        userId: attempt.userId,
+        title: "Оценка обновлена",
+        message: `Преподаватель обновил оценку за работу «${attempt.test.title}»: ${updated.score}%.`
+      }
+    });
+    sendNotification(attempt.userId, notification);
+
+    res.json({ attempt: updated, feedback: data.feedback || "" });
   })
 );
 

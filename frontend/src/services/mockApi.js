@@ -1003,6 +1003,31 @@ export async function mockApi(path, options = {}) {
     saveState(state);
     return { submission: state.manualSubmissions.find((item) => item.id === id) };
   }
+  if (route.startsWith("/teacher/attempts/") && route.endsWith("/regrade")) {
+    const id = route.split("/")[3];
+    const attempt = state.attempts.find((item) => item.id === id);
+    const totalPoints = Number(attempt?.totalPoints || 100);
+    const autoScore = Math.min(Number(body.autoScore ?? attempt?.autoScore ?? 0), totalPoints);
+    const earnedPoints = Math.round((Number(body.score || 0) / 100) * totalPoints);
+    const manualScore = Math.max(earnedPoints - autoScore, 0);
+    if (attempt) {
+      state.attempts = state.attempts.map((item) =>
+        item.id === id
+          ? { ...item, status: "GRADED", score: Math.round(Number(body.score || 0)), autoScore, manualScore, earnedPoints }
+          : item
+      );
+      state.notifications.unshift({
+        id: `notification-regrade-${id}-${Date.now()}`,
+        recipientId: attempt.userId,
+        attemptId: id,
+        title: "Оценка обновлена",
+        message: `Преподаватель обновил(а) оценку за работу: ${Math.round(Number(body.score || 0))}%.`,
+        read: false
+      });
+      saveState(state);
+    }
+    return { attempt: state.attempts.find((item) => item.id === id) || { id, score: Number(body.score || 0), autoScore, manualScore, earnedPoints }, feedback: body.feedback || "" };
+  }
   if (route.startsWith("/teacher/students/") && route.includes("/extensions/")) {
     const [, , , studentId, , assignmentId] = route.split("/");
     state.deadlineExtensions = {

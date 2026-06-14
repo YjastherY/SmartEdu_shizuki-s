@@ -753,11 +753,15 @@ function buildReviewWorks(submissions, selectedStudent, selectedStudentId) {
   const grades = (selectedStudent.grades || []).map((grade) => ({
     id: `grade-${selectedStudent.id}-${grade.title}`,
     type: "grade",
+    attemptId: grade.attemptId,
     title: grade.title,
     course: selectedStudent.assignments?.find((assignment) => assignment.title === grade.title)?.course || selectedStudent.group || "Курс",
     status: grade.details.some((detail) => String(detail.value).includes("На проверке")) ? "PENDING" : "GRADED",
     dateValue: "",
     score: grade.score,
+    autoScore: grade.autoScore,
+    manualScore: grade.manualScore,
+    totalPoints: grade.totalPoints,
     details: grade.details.map((detail) => `${detail.label}: ${detail.value}`).join("; ")
   }));
 
@@ -777,13 +781,50 @@ function buildReviewWorks(submissions, selectedStudent, selectedStudentId) {
   [...manual, ...grades, ...assignments].forEach((work) => {
     const key = `${work.title}-${work.course}`;
     const existing = works.get(key);
-    if (!existing || work.type === "submission" || existing.status !== "PENDING") works.set(key, work);
+    if (!existing || work.type === "submission" || (work.type === "grade" && existing.type !== "submission")) {
+      works.set(key, work);
+    }
   });
 
   return Array.from(works.values());
 }
 
 function WorkSummaryCard({ work }) {
+  const savedReview = readWorkReview(work.id);
+  const [editing, setEditing] = useState(false);
+  const [displayScore, setDisplayScore] = useState(savedReview?.score ?? work.score ?? null);
+  const [draft, setDraft] = useState({
+    score: savedReview?.score ?? work.score ?? "",
+    autoScore: savedReview?.autoScore ?? work.autoScore ?? "",
+    feedback: savedReview?.feedback ?? ""
+  });
+  const [message, setMessage] = useState(savedReview ? "Есть сохранённый черновик перепроверки" : "");
+
+  function updateDraft(patch) {
+    const next = { ...draft, ...patch };
+    setDraft(next);
+    saveWorkReview(work.id, next);
+    setMessage("Черновик сохранён");
+  }
+
+  async function saveReview() {
+    const payload = {
+      score: Number(draft.score || 0),
+      autoScore: draft.autoScore === "" ? undefined : Number(draft.autoScore),
+      feedback: draft.feedback || ""
+    };
+    if (work.attemptId) {
+      await api(`/teacher/attempts/${work.attemptId}/regrade`, {
+        method: "PATCH",
+        body: JSON.stringify(payload)
+      });
+    }
+    removeWorkReview(work.id);
+    setDisplayScore(payload.score);
+    setEditing(false);
+    setMessage(work.attemptId ? "Оценка обновлена" : "Перепроверка сохранена локально");
+  }
+
   return (
     <div className="panel space-y-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -795,13 +836,37 @@ function WorkSummaryCard({ work }) {
           {reviewStatusLabel(work.status)}
         </span>
       </div>
-      {work.score != null && (
+      {displayScore != null && (
         <div className="rounded-lg bg-brand-50 p-4 text-brand-700 dark:bg-brand-950 dark:text-brand-100">
           <p className="text-sm font-semibold">Оценка</p>
-          <p className="text-2xl font-bold">{work.score}%</p>
+          <p className="text-2xl font-bold">{displayScore}%</p>
         </div>
       )}
       <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300">{work.details}</p>
+      {editing ? (
+        <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="text-sm font-medium">
+              Итоговая оценка, %
+              <input className="input mt-1" type="number" min="0" max="100" value={draft.score} onChange={(event) => updateDraft({ score: Number(event.target.value) })} />
+            </label>
+            <label className="text-sm font-medium">
+              Баллы автопроверки
+              <input className="input mt-1" type="number" min="0" max={work.totalPoints || 100} value={draft.autoScore} onChange={(event) => updateDraft({ autoScore: Number(event.target.value) })} />
+            </label>
+          </div>
+          <textarea className="input mt-3 min-h-24" placeholder="Комментарий к перепроверке" value={draft.feedback} onChange={(event) => updateDraft({ feedback: event.target.value })} />
+          <div className="mt-3 flex flex-wrap justify-end gap-2">
+            <button className="btn-secondary" onClick={() => setEditing(false)}>Отмена</button>
+            <button className="btn-primary" onClick={saveReview}>Сохранить перепроверку</button>
+          </div>
+        </div>
+      ) : (
+        <button className="btn-secondary w-fit" onClick={() => setEditing(true)}>
+          Перепроверить
+        </button>
+      )}
+      {message && <p className="text-sm text-slate-500">{message}</p>}
     </div>
   );
 }
@@ -1058,6 +1123,27 @@ function saveGradeDraft(id, draft) {
 
 function removeGradeDraft(id) {
   localStorage.removeItem(gradeDraftKey(id));
+}
+
+function workReviewKey(id) {
+  return `smartedu-work-review:${id}`;
+}
+
+function readWorkReview(id) {
+  try {
+    const review = localStorage.getItem(workReviewKey(id));
+    return review ? JSON.parse(review) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveWorkReview(id, draft) {
+  localStorage.setItem(workReviewKey(id), JSON.stringify(draft));
+}
+
+function removeWorkReview(id) {
+  localStorage.removeItem(workReviewKey(id));
 }
 
 function ProgressTab({ groups, selectedGroupId, selectedStudentId, selectedGroup, selectedStudent, setSelectedGroupId, setSelectedStudentId, extendDeadline }) {
