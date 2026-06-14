@@ -66,6 +66,7 @@ const initialState = {
       audience: "STUDENT",
       title: "Новый курс доступен",
       message: "Курс React Start уже можно проходить.",
+      targetPath: "/courses/course-1",
       read: false
     },
     {
@@ -73,6 +74,7 @@ const initialState = {
       audience: "STUDENT",
       title: "Проверь прогресс",
       message: "После прохождения теста статистика обновится автоматически.",
+      targetPath: "/progress",
       read: false
     }
   ],
@@ -596,6 +598,7 @@ function syncTeacherNotifications(state) {
         id,
         recipientId: group.teacherId,
         submissionId: submission.id,
+        targetPath: "/teacher",
         title: "Работа на проверку",
         message: `${student?.name || "Студент"} сдал(а) тест «${submission.testTitle}».`,
         read: false
@@ -671,6 +674,12 @@ export async function mockApi(path, options = {}) {
     state.notifications = state.notifications.map((item) => (isNotificationForUser(item, state.user) ? { ...item, read: true } : item));
     saveState(state);
     return { notifications: state.notifications.filter((item) => isNotificationForUser(item, state.user)) };
+  }
+  if (route.startsWith("/notifications/") && route.endsWith("/read")) {
+    const id = route.split("/")[2];
+    state.notifications = state.notifications.map((item) => (item.id === id && isNotificationForUser(item, state.user) ? { ...item, read: true } : item));
+    saveState(state);
+    return { notification: state.notifications.find((item) => item.id === id) || null };
   }
   if (route === "/chat/groups") {
     return {
@@ -1034,6 +1043,7 @@ export async function mockApi(path, options = {}) {
         id: `notification-grade-${id}-${Date.now()}`,
         recipientId: submission.studentId,
         submissionId: id,
+        targetPath: "/grades",
         title: "Оценка выставлена",
         message: `Преподаватель оценил(а) работу «${submission.testTitle}»: ${manualScore} из ${submission.maxScore}.`,
         read: false
@@ -1128,6 +1138,7 @@ export async function mockApi(path, options = {}) {
         id: `notification-regrade-${id}-${Date.now()}`,
         recipientId: attempt.userId,
         attemptId: id,
+        targetPath: "/grades",
         title: "Оценка обновлена",
         message: `Преподаватель обновил(а) оценку за работу: ${score}%.`,
         read: false
@@ -1148,9 +1159,11 @@ export async function mockApi(path, options = {}) {
     const student = state.users.find((user) => user.id === studentId);
     const insight = studentInsights[studentId] || studentInsights["user-1"];
     const assignment = insight.assignments?.find((item) => item.id === assignmentId);
+    const lesson = courses.flatMap((course) => course.modules).flatMap((module) => module.lessons).find((item) => item.test?.id === assignmentId || item.id === assignmentId);
     state.notifications.unshift({
       id: `notification-extension-${studentId}-${assignmentId}-${Date.now()}`,
       recipientId: studentId,
+      targetPath: lesson ? `/lessons/${lesson.id}` : "/courses",
       title: "Срок задания продлён",
       message: `Преподаватель продлил срок задания «${assignment?.title || "Задание"}» до ${new Date(body.deadline).toLocaleDateString("ru-RU")}.`,
       read: false

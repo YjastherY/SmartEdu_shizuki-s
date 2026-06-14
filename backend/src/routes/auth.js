@@ -34,7 +34,9 @@ router.post(
         notifications: {
           create: {
             title: "Добро пожаловать в SmartEdu",
-            message: "Начните первый курс и отслеживайте прогресс в dashboard."
+            message: "Начните первый курс и отслеживайте прогресс в dashboard.",
+            type: "welcome",
+            targetPath: "/courses"
           }
         }
       }

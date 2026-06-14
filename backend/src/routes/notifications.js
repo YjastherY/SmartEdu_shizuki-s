@@ -40,9 +40,12 @@ router.patch(
   "/notifications/:id/read",
   authRequired,
   asyncHandler(async (req, res) => {
-    const notification = await prisma.notification.update({
-      where: { id: req.params.id },
+    await prisma.notification.updateMany({
+      where: { id: req.params.id, userId: req.user.id },
       data: { read: true }
+    });
+    const notification = await prisma.notification.findFirst({
+      where: { id: req.params.id, userId: req.user.id }
     });
 
     res.json({ notification });

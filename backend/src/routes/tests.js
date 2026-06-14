@@ -97,7 +97,10 @@ async function notifyTeachersForSubmission(test, user) {
         data: {
           userId: teacherId,
           title: "Работа на проверку",
-          message: `${user.name} отправил(а) развернутый ответ по тесту «${test.title}».`
+          message: `${user.name} отправил(а) развернутый ответ по тесту «${test.title}».`,
+          type: "review",
+          targetPath: "/teacher",
+          metadata: { testId: test.id, lessonId: test.lessonId, courseId: test.lesson.module.courseId, studentId: user.id }
         }
       });
       sendNotification(teacherId, notification);

@@ -399,7 +399,10 @@ router.patch(
       data: {
         userId: submission.userId,
         title: "Оценка выставлена",
-        message: `Преподаватель оценил работу «${submission.question.test.title}»: ${manualScore} из ${submission.maxScore}.`
+        message: `Преподаватель оценил работу «${submission.question.test.title}»: ${manualScore} из ${submission.maxScore}.`,
+        type: "grade",
+        targetPath: "/grades",
+        metadata: { submissionId: submission.id, attemptId: submission.attemptId, testId: submission.question.testId }
       }
     });
     sendNotification(submission.userId, notification);
@@ -425,7 +428,10 @@ router.patch(
       data: {
         userId: req.params.studentId,
         title: "Срок задания продлён",
-        message: `Преподаватель продлил срок задания «${extension.test.title}» до ${extension.deadline.toLocaleDateString("ru-RU")}.`
+        message: `Преподаватель продлил срок задания «${extension.test.title}» до ${extension.deadline.toLocaleDateString("ru-RU")}.`,
+        type: "deadline",
+        targetPath: `/lessons/${extension.test.lessonId}`,
+        metadata: { testId: extension.testId, lessonId: extension.test.lessonId }
       }
     });
     sendNotification(req.params.studentId, notification);
@@ -569,7 +575,10 @@ router.patch(
       data: {
         userId: attempt.userId,
         title: "Оценка обновлена",
-        message: `Преподаватель обновил оценку за работу «${attempt.test.title}»: ${updated.score}%.`
+        message: `Преподаватель обновил оценку за работу «${attempt.test.title}»: ${updated.score}%.`,
+        type: "grade",
+        targetPath: "/grades",
+        metadata: { attemptId: attempt.id, testId: attempt.testId }
       }
     });
     sendNotification(attempt.userId, notification);
