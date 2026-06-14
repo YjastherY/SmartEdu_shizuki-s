@@ -66,6 +66,33 @@ function assignmentStatus(test, extension) {
   return new Date(deadline) < new Date() ? "OVERDUE" : extension ? "EXTENDED" : "ACTIVE";
 }
 
+function answerLabel(question, value) {
+  if (value == null || value === "") return "Нет ответа";
+  if (question.type === "MATCHING") {
+    const selected = value && typeof value === "object" ? value : {};
+    const pairs = question.answers.map((item) => item.text.split("→").map((part) => part.trim()));
+    return pairs.map(([left], index) => `${left}: ${selected[index] || "нет ответа"}`).join("; ");
+  }
+  if (Array.isArray(value)) {
+    return value.map((id) => question.answers.find((answer) => answer.id === String(id))?.text || String(id)).join(", ");
+  }
+  return question.answers.find((answer) => answer.id === String(value))?.text || String(value);
+}
+
+function correctLabel(question) {
+  if (question.type === "MANUAL") return "Проверяется преподавателем";
+  if (question.type === "MATCHING") return question.answers.map((item) => item.text).join("; ");
+  return question.answers.filter((answer) => answer.isCorrect).map((answer) => answer.text).join(", ") || "Не задано";
+}
+
+function questionScoreFromReview(attempt, question) {
+  const review = Array.isArray(attempt.reviewSnapshot) ? attempt.reviewSnapshot.find((item) => item.questionId === question.id) : null;
+  if (review) return Number(review.score || 0);
+  const manual = attempt.manualSubmissions.find((item) => item.questionId === question.id);
+  if (manual?.score != null) return manual.score;
+  return 0;
+}
+
 async function teacherCourseFilter(user) {
   if (user.role === "ADMIN") return {};
 
@@ -406,6 +433,70 @@ router.patch(
   })
 );
 
+router.get(
+  "/teacher/attempts/:id",
+  authRequired,
+  teacherOrAdmin,
+  asyncHandler(async (req, res) => {
+    const attempt = await prisma.testAttempt.findUnique({
+      where: { id: req.params.id },
+      include: {
+        user: { include: { group: true } },
+        manualSubmissions: true,
+        test: {
+          include: {
+            questions: { include: { answers: true }, orderBy: { order: "asc" } },
+            lesson: { include: { module: { include: { course: true } } } }
+          }
+        }
+      }
+    });
+
+    if (!attempt) return res.status(404).json({ message: "Attempt not found" });
+    if (req.user.role !== "ADMIN" && attempt.user.group?.teacherId !== req.user.id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const answers = attempt.answerSnapshot && typeof attempt.answerSnapshot === "object" ? attempt.answerSnapshot : {};
+    const review = Array.isArray(attempt.reviewSnapshot) ? attempt.reviewSnapshot : [];
+    const questions = attempt.test.questions.map((question) => {
+      const manual = attempt.manualSubmissions.find((item) => item.questionId === question.id);
+      const saved = review.find((item) => item.questionId === question.id);
+      const value = question.type === "MANUAL" ? manual?.answer : answers[question.id];
+      return {
+        id: question.id,
+        text: question.text,
+        type: question.type,
+        maxScore: question.maxScore,
+        answer: value,
+        answerText: answerLabel(question, value),
+        correctText: correctLabel(question),
+        score: saved?.score ?? manual?.score ?? 0,
+        feedback: manual?.feedback || "",
+        hasSnapshot: question.type === "MANUAL" || Object.hasOwn(answers, question.id)
+      };
+    });
+
+    res.json({
+      attempt: {
+        id: attempt.id,
+        score: attempt.score,
+        autoScore: attempt.autoScore,
+        manualScore: attempt.manualScore,
+        earnedPoints: attempt.earnedPoints,
+        totalPoints: attempt.totalPoints,
+        status: attempt.status,
+        feedback: attempt.feedback,
+        createdAt: attempt.createdAt,
+        student: { id: attempt.user.id, name: attempt.user.name, email: attempt.user.email },
+        course: attempt.test.lesson.module.course.title,
+        test: { id: attempt.test.id, title: attempt.test.title },
+        questions
+      }
+    });
+  })
+);
+
 router.patch(
   "/teacher/attempts/:id/regrade",
   authRequired,
@@ -414,12 +505,14 @@ router.patch(
     const data = z.object({
       score: z.number().min(0).max(100),
       autoScore: z.number().min(0).optional(),
+      questionScores: z.record(z.string(), z.number().min(0)).optional(),
       feedback: z.string().optional().or(z.literal(""))
     }).parse(req.body);
     const attempt = await prisma.testAttempt.findUnique({
       where: { id: req.params.id },
       include: {
         user: { include: { group: true } },
+        manualSubmissions: true,
         test: { include: { lesson: { include: { module: { include: { course: true } } } } } }
       }
     });
@@ -429,19 +522,47 @@ router.patch(
       return res.status(403).json({ message: "Forbidden" });
     }
 
-    const autoScore = data.autoScore == null ? attempt.autoScore : Math.min(data.autoScore, attempt.totalPoints);
-    const earnedPoints = Math.round((data.score / 100) * attempt.totalPoints);
+    const questions = await prisma.question.findMany({ where: { testId: attempt.testId } });
+    const questionScores = data.questionScores || {};
+    const reviewSnapshot = questions.map((question) => {
+      const current = questionScoreFromReview(attempt, question);
+      const score = Math.min(Number(questionScores[question.id] ?? current), Number(question.maxScore || 0));
+      return { questionId: question.id, score, maxScore: question.maxScore, auto: question.type !== "MANUAL" };
+    });
+    const earnedPoints = data.questionScores
+      ? reviewSnapshot.reduce((sum, item) => sum + Number(item.score || 0), 0)
+      : Math.round((data.score / 100) * attempt.totalPoints);
+    const autoScore = data.autoScore == null
+      ? reviewSnapshot.filter((item) => item.auto).reduce((sum, item) => sum + Number(item.score || 0), 0)
+      : Math.min(data.autoScore, attempt.totalPoints);
     const manualScore = Math.max(earnedPoints - autoScore, 0);
+    const score = attempt.totalPoints ? Math.round((earnedPoints / attempt.totalPoints) * 100) : Math.round(data.score);
     const updated = await prisma.testAttempt.update({
       where: { id: attempt.id },
       data: {
-        score: Math.round(data.score),
+        score,
         autoScore,
         manualScore,
         earnedPoints,
+        reviewSnapshot,
+        feedback: data.feedback || null,
         status: "GRADED"
       }
     });
+    await Promise.all(
+      attempt.manualSubmissions.map((submission) => {
+        const review = reviewSnapshot.find((item) => item.questionId === submission.questionId);
+        return prisma.manualSubmission.update({
+          where: { id: submission.id },
+          data: {
+            score: review?.score ?? submission.score ?? 0,
+            feedback: data.feedback || submission.feedback,
+            status: "GRADED",
+            gradedAt: new Date()
+          }
+        });
+      })
+    );
 
     const notification = await prisma.notification.create({
       data: {

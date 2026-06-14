@@ -161,6 +161,13 @@ router.post(
         autoScore,
         earnedPoints: autoScore,
         totalPoints,
+        answerSnapshot: data.answers,
+        reviewSnapshot: autoQuestions.map((question) => ({
+          questionId: question.id,
+          score: isAutoCorrect(question, data.answers[question.id]) ? getQuestionPoints(question) : 0,
+          maxScore: getQuestionPoints(question),
+          auto: true
+        })),
         status: pendingReview ? "PENDING_REVIEW" : "GRADED",
         manualSubmissions: {
           create: manualQuestions.map((question) => ({

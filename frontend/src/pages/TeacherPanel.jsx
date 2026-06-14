@@ -792,11 +792,14 @@ function buildReviewWorks(submissions, selectedStudent, selectedStudentId) {
 function WorkSummaryCard({ work }) {
   const savedReview = readWorkReview(work.id);
   const [editing, setEditing] = useState(false);
+  const [attempt, setAttempt] = useState(null);
+  const [loadingAttempt, setLoadingAttempt] = useState(false);
   const [displayScore, setDisplayScore] = useState(savedReview?.score ?? work.score ?? null);
   const [draft, setDraft] = useState({
     score: savedReview?.score ?? work.score ?? "",
     autoScore: savedReview?.autoScore ?? work.autoScore ?? "",
-    feedback: savedReview?.feedback ?? ""
+    feedback: savedReview?.feedback ?? "",
+    questionScores: savedReview?.questionScores ?? {}
   });
   const [message, setMessage] = useState(savedReview ? "Есть сохранённый черновик перепроверки" : "");
 
@@ -807,10 +810,42 @@ function WorkSummaryCard({ work }) {
     setMessage("Черновик сохранён");
   }
 
+  async function openAttemptReview() {
+    if (!work.attemptId) {
+      setEditing(true);
+      return;
+    }
+    setLoadingAttempt(true);
+    setMessage("");
+    try {
+      const result = await api(`/teacher/attempts/${work.attemptId}`);
+      setAttempt(result.attempt);
+      const nextScores = Object.fromEntries(result.attempt.questions.map((question) => [question.id, question.score ?? 0]));
+      updateDraft({
+        score: result.attempt.score,
+        autoScore: result.attempt.autoScore,
+        feedback: result.attempt.feedback || draft.feedback || "",
+        questionScores: savedReview?.questionScores && Object.keys(savedReview.questionScores).length ? savedReview.questionScores : nextScores
+      });
+      setEditing(true);
+    } catch (error) {
+      setMessage(error.message || "Не удалось открыть попытку");
+    } finally {
+      setLoadingAttempt(false);
+    }
+  }
+
   async function saveReview() {
+    const questionScores = attempt
+      ? Object.fromEntries(attempt.questions.map((question) => [question.id, draft.questionScores?.[question.id] ?? question.score ?? 0]))
+      : draft.questionScores || {};
+    const scoreFromQuestions = attempt
+      ? Math.round((Object.values(questionScores).reduce((sum, value) => sum + Number(value || 0), 0) / (attempt.totalPoints || 1)) * 100)
+      : null;
     const payload = {
-      score: Number(draft.score || 0),
-      autoScore: draft.autoScore === "" ? undefined : Number(draft.autoScore),
+      score: scoreFromQuestions ?? Number(draft.score || 0),
+      autoScore: attempt || draft.autoScore === "" ? undefined : Number(draft.autoScore),
+      questionScores: attempt ? questionScores : undefined,
       feedback: draft.feedback || ""
     };
     if (work.attemptId) {
@@ -821,6 +856,7 @@ function WorkSummaryCard({ work }) {
     }
     removeWorkReview(work.id);
     setDisplayScore(payload.score);
+    setAttempt((value) => value ? { ...value, score: payload.score, feedback: payload.feedback } : value);
     setEditing(false);
     setMessage(work.attemptId ? "Оценка обновлена" : "Перепроверка сохранена локально");
   }
@@ -845,16 +881,20 @@ function WorkSummaryCard({ work }) {
       <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300">{work.details}</p>
       {editing ? (
         <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="text-sm font-medium">
-              Итоговая оценка, %
-              <input className="input mt-1" type="number" min="0" max="100" value={draft.score} onChange={(event) => updateDraft({ score: Number(event.target.value) })} />
-            </label>
-            <label className="text-sm font-medium">
-              Баллы автопроверки
-              <input className="input mt-1" type="number" min="0" max={work.totalPoints || 100} value={draft.autoScore} onChange={(event) => updateDraft({ autoScore: Number(event.target.value) })} />
-            </label>
-          </div>
+          {attempt ? (
+            <AttemptReviewEditor attempt={attempt} draft={draft} updateDraft={updateDraft} />
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-sm font-medium">
+                Итоговая оценка, %
+                <input className="input mt-1" type="number" min="0" max="100" value={draft.score} onChange={(event) => updateDraft({ score: Number(event.target.value) })} />
+              </label>
+              <label className="text-sm font-medium">
+                Баллы автопроверки
+                <input className="input mt-1" type="number" min="0" max={work.totalPoints || 100} value={draft.autoScore} onChange={(event) => updateDraft({ autoScore: Number(event.target.value) })} />
+              </label>
+            </div>
+          )}
           <textarea className="input mt-3 min-h-24" placeholder="Комментарий к перепроверке" value={draft.feedback} onChange={(event) => updateDraft({ feedback: event.target.value })} />
           <div className="mt-3 flex flex-wrap justify-end gap-2">
             <button className="btn-secondary" onClick={() => setEditing(false)}>Отмена</button>
@@ -862,11 +902,68 @@ function WorkSummaryCard({ work }) {
           </div>
         </div>
       ) : (
-        <button className="btn-secondary w-fit" onClick={() => setEditing(true)}>
-          Перепроверить
+        <button className="btn-secondary w-fit" onClick={openAttemptReview} disabled={loadingAttempt}>
+          {loadingAttempt ? "Открываем..." : "Открыть и перепроверить"}
         </button>
       )}
       {message && <p className="text-sm text-slate-500">{message}</p>}
+    </div>
+  );
+}
+
+function AttemptReviewEditor({ attempt, draft, updateDraft }) {
+  const questionScores = draft.questionScores || {};
+  const earned = attempt.questions.reduce((sum, question) => sum + Number(questionScores[question.id] ?? question.score ?? 0), 0);
+  const percent = attempt.totalPoints ? Math.round((earned / attempt.totalPoints) * 100) : 0;
+
+  function updateQuestionScore(question, value) {
+    const score = Math.min(Math.max(Number(value || 0), 0), Number(question.maxScore || 0));
+    const nextScores = {
+      ...questionScores,
+      [question.id]: score
+    };
+    const nextEarned = attempt.questions.reduce((sum, item) => sum + Number(nextScores[item.id] ?? item.score ?? 0), 0);
+    updateDraft({
+      score: attempt.totalPoints ? Math.round((nextEarned / attempt.totalPoints) * 100) : 0,
+      questionScores: nextScores
+    });
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800">
+        <p className="text-sm text-slate-500 dark:text-slate-300">{attempt.student.name} • {attempt.course}</p>
+        <p className="font-semibold">{attempt.test.title}</p>
+        <p className="mt-1 text-sm font-semibold text-brand-600 dark:text-brand-300">
+          Сейчас: {earned} из {attempt.totalPoints} баллов, итог {percent}%
+        </p>
+      </div>
+      <div className="space-y-3">
+        {attempt.questions.map((question, index) => (
+          <div key={question.id} className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="font-semibold">{index + 1}. {question.text}</p>
+                <p className="mt-2 text-sm text-slate-500 dark:text-slate-300">Ответ ученика: {question.answerText}</p>
+                <p className="mt-1 text-sm text-emerald-600 dark:text-emerald-300">Правильный ответ: {question.correctText}</p>
+                {!question.hasSnapshot && <p className="mt-1 text-sm text-amber-600 dark:text-amber-300">Детальный ответ для этой старой попытки не был сохранён.</p>}
+              </div>
+              <label className="text-sm font-medium sm:w-32">
+                Баллы
+                <input
+                  className="input mt-1"
+                  type="number"
+                  min="0"
+                  max={question.maxScore}
+                  value={questionScores[question.id] ?? question.score ?? 0}
+                  onChange={(event) => updateQuestionScore(question, event.target.value)}
+                />
+                <span className="mt-1 block text-xs text-slate-500">из {question.maxScore}</span>
+              </label>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

@@ -209,6 +209,9 @@ model TestAttempt {
   manualScore Int?
   earnedPoints Int     @default(0)
   totalPoints Int      @default(0)
+  answerSnapshot Json?
+  reviewSnapshot Json?
+  feedback    String?
   status      AttemptStatus @default(GRADED)
   createdAt   DateTime @default(now())
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -268,6 +268,7 @@ const studentInsights = {
 function buildGrades(state, studentId, insight) {
   return (insight.gradeTests || []).map((grade) => {
     const manualSubmission = state.manualSubmissions.find((item) => item.studentId === studentId && (!grade.manualTitle || item.testTitle === grade.manualTitle));
+    const attempt = state.attempts.find((item) => item.userId === studentId && item.test?.title === grade.title);
     const details = [{ label: "Автопроверка", value: `${grade.autoScore}%` }];
     if (grade.manualTitle) {
       details.push({
@@ -280,8 +281,12 @@ function buildGrades(state, studentId, insight) {
       });
     }
     return {
+      attemptId: attempt?.id || manualSubmission?.attemptId,
       title: grade.title,
-      score: manualSubmission?.finalScore ?? grade.autoScore,
+      score: attempt?.score ?? manualSubmission?.finalScore ?? grade.autoScore,
+      autoScore: attempt?.autoScore,
+      manualScore: attempt?.manualScore,
+      totalPoints: attempt?.totalPoints,
       details
     };
   });
@@ -326,6 +331,32 @@ function getState() {
   else state.courses = courses;
   state.deadlineExtensions = state.deadlineExtensions || {};
   state.chatMessages = state.chatMessages || initialState.chatMessages;
+  if (!state.attempts.some((item) => item.id === "attempt-demo-review")) {
+    const test = courses[0].modules[0].lessons[1].test;
+    state.attempts.unshift({
+      id: "attempt-demo-review",
+      userId: "user-4",
+      testId: test.id,
+      score: 78,
+      autoScore: 20,
+      manualScore: 11,
+      totalPoints: 40,
+      earnedPoints: 31,
+      status: "GRADED",
+      createdAt: new Date().toISOString(),
+      answerSnapshot: {
+        "question-1": "answer-1",
+        "question-2": "answer-5",
+        "question-3": "Компонент стоит выносить, когда блок повторяется или стал слишком большим."
+      },
+      reviewSnapshot: [
+        { questionId: "question-1", score: 10, maxScore: 10, auto: true },
+        { questionId: "question-2", score: 0, maxScore: 10, auto: true },
+        { questionId: "question-3", score: 11, maxScore: 20, auto: false }
+      ],
+      test
+    });
+  }
   if (!state.manualSubmissions.some((item) => item.id === "submission-2")) {
     state.manualSubmissions.push({
       id: "submission-2",
@@ -344,6 +375,7 @@ function getState() {
   }
   state.manualSubmissions = state.manualSubmissions.map((item) => ({
     ...item,
+    attemptId: item.attemptId ?? (item.id === "submission-1" ? "attempt-demo-review" : item.attemptId),
     question: item.question ?? (item.id === "submission-2" ? "Чем props отличаются от состояния компонента?" : "Зачем выносить интерфейс в отдельный компонент?"),
     maxScore: item.maxScore ?? (item.id === "submission-2" ? 15 : 20),
     autoScore: item.autoScore ?? (item.id === "submission-2" ? 25 : 18),
@@ -489,6 +521,15 @@ function getAnswerText(question, answer) {
     return question.pairs.map((pair, index) => `${pair.left}: ${answer?.[index] || "без ответа"}`).join("; ");
   }
   return answer || "Без ответа";
+}
+
+function getCorrectText(question) {
+  if (question.type === "MANUAL") return "Проверяется преподавателем";
+  if (question.answers?.length) return question.answers.filter((item) => item.isCorrect).map((item) => item.text).join(", ") || "Не задано";
+  if (question.type === "SINGLE_CHOICE") return question.options?.[question.correctIndexes?.[0]] || "Не задано";
+  if (question.type === "MULTIPLE_CHOICE") return (question.correctIndexes || []).map((index) => question.options?.[index]).filter(Boolean).join(", ") || "Не задано";
+  if (question.type === "MATCHING") return question.pairs?.map((pair) => `${pair.left}: ${pair.right}`).join("; ") || "Не задано";
+  return "Не задано";
 }
 
 function getBestScore(attempts) {
@@ -814,12 +855,20 @@ export async function mockApi(path, options = {}) {
     }));
     state.attempts.unshift({
       id: attemptId,
+      userId: state.user.id,
       testId,
       score,
       autoScore,
       manualScore: null,
       totalPoints,
       earnedPoints: autoScore,
+      answerSnapshot: body.answers,
+      reviewSnapshot: autoQuestions.map((question) => ({
+        questionId: question.id,
+        score: isAutoCorrect(question, body.answers[question.id]) ? getQuestionPoints(question) : 0,
+        maxScore: getQuestionPoints(question),
+        auto: true
+      })),
       status: pendingReview ? "PENDING_REVIEW" : "GRADED",
       createdAt: new Date().toISOString(),
       test: lesson.test
@@ -1003,30 +1052,89 @@ export async function mockApi(path, options = {}) {
     saveState(state);
     return { submission: state.manualSubmissions.find((item) => item.id === id) };
   }
+  if (route.startsWith("/teacher/attempts/") && options.method !== "PATCH") {
+    const id = route.split("/")[3];
+    const attempt = state.attempts.find((item) => item.id === id);
+    if (!attempt) throw new Error("Попытка не найдена");
+    const test = attempt.test || courses.flatMap((course) => course.modules).flatMap((module) => module.lessons).find((lesson) => lesson.test?.id === attempt.testId)?.test;
+    const student = state.users.find((user) => user.id === attempt.userId) || state.user;
+    const course = courses.find((item) => item.modules.some((module) => module.lessons.some((lesson) => lesson.test?.id === attempt.testId)));
+    const manualSubmissions = state.manualSubmissions.filter((item) => item.attemptId === attempt.id);
+    const review = Array.isArray(attempt.reviewSnapshot) ? attempt.reviewSnapshot : [];
+    return {
+      attempt: {
+        id: attempt.id,
+        score: attempt.score,
+        autoScore: attempt.autoScore,
+        manualScore: attempt.manualScore,
+        earnedPoints: attempt.earnedPoints,
+        totalPoints: attempt.totalPoints,
+        status: attempt.status,
+        feedback: attempt.feedback || "",
+        createdAt: attempt.createdAt,
+        student: { id: student.id, name: student.name, email: student.email },
+        course: course?.title || "Курс",
+        test: { id: test.id, title: test.title },
+        questions: (test.questions || []).map((question) => {
+          const manual = manualSubmissions.find((item) => item.question === question.text || item.questionId === question.id);
+          const saved = review.find((item) => item.questionId === question.id);
+          const answer = question.type === "MANUAL" ? manual?.answer || attempt.answerSnapshot?.[question.id] : attempt.answerSnapshot?.[question.id];
+          return {
+            id: question.id,
+            text: question.text,
+            type: question.type,
+            maxScore: getQuestionPoints(question),
+            answer,
+            answerText: getAnswerText(question, answer),
+            correctText: getCorrectText(question),
+            score: saved?.score ?? manual?.score ?? 0,
+            feedback: manual?.feedback || "",
+            hasSnapshot: question.type === "MANUAL" || Object.hasOwn(attempt.answerSnapshot || {}, question.id)
+          };
+        })
+      }
+    };
+  }
   if (route.startsWith("/teacher/attempts/") && route.endsWith("/regrade")) {
     const id = route.split("/")[3];
     const attempt = state.attempts.find((item) => item.id === id);
-    const totalPoints = Number(attempt?.totalPoints || 100);
-    const autoScore = Math.min(Number(body.autoScore ?? attempt?.autoScore ?? 0), totalPoints);
-    const earnedPoints = Math.round((Number(body.score || 0) / 100) * totalPoints);
+    const test = attempt?.test || courses.flatMap((course) => course.modules).flatMap((module) => module.lessons).find((lesson) => lesson.test?.id === attempt?.testId)?.test;
+    const totalPoints = Number(attempt?.totalPoints || test?.questions?.reduce((sum, question) => sum + getQuestionPoints(question), 0) || 100);
+    const reviewSnapshot = (test?.questions || []).map((question) => ({
+      questionId: question.id,
+      score: Math.min(Number(body.questionScores?.[question.id] ?? 0), getQuestionPoints(question)),
+      maxScore: getQuestionPoints(question),
+      auto: question.type !== "MANUAL"
+    }));
+    const earnedPoints = body.questionScores
+      ? reviewSnapshot.reduce((sum, item) => sum + Number(item.score || 0), 0)
+      : Math.round((Number(body.score || 0) / 100) * totalPoints);
+    const autoScore = Math.min(Number(body.autoScore ?? reviewSnapshot.filter((item) => item.auto).reduce((sum, item) => sum + Number(item.score || 0), 0)), totalPoints);
     const manualScore = Math.max(earnedPoints - autoScore, 0);
+    const score = totalPoints ? Math.round((earnedPoints / totalPoints) * 100) : Math.round(Number(body.score || 0));
     if (attempt) {
       state.attempts = state.attempts.map((item) =>
         item.id === id
-          ? { ...item, status: "GRADED", score: Math.round(Number(body.score || 0)), autoScore, manualScore, earnedPoints }
+          ? { ...item, status: "GRADED", score, autoScore, manualScore, earnedPoints, reviewSnapshot, feedback: body.feedback || "" }
           : item
       );
+      state.manualSubmissions = state.manualSubmissions.map((item) => {
+        if (item.attemptId !== id) return item;
+        const question = test?.questions?.find((candidate) => candidate.text === item.question || candidate.id === item.questionId);
+        const review = reviewSnapshot.find((candidate) => candidate.questionId === question?.id);
+        return { ...item, status: "GRADED", score: review?.score ?? item.score ?? 0, finalScore: score, feedback: body.feedback || item.feedback || "" };
+      });
       state.notifications.unshift({
         id: `notification-regrade-${id}-${Date.now()}`,
         recipientId: attempt.userId,
         attemptId: id,
         title: "Оценка обновлена",
-        message: `Преподаватель обновил(а) оценку за работу: ${Math.round(Number(body.score || 0))}%.`,
+        message: `Преподаватель обновил(а) оценку за работу: ${score}%.`,
         read: false
       });
       saveState(state);
     }
-    return { attempt: state.attempts.find((item) => item.id === id) || { id, score: Number(body.score || 0), autoScore, manualScore, earnedPoints }, feedback: body.feedback || "" };
+    return { attempt: state.attempts.find((item) => item.id === id) || { id, score, autoScore, manualScore, earnedPoints }, feedback: body.feedback || "" };
   }
   if (route.startsWith("/teacher/students/") && route.includes("/extensions/")) {
     const [, , , studentId, , assignmentId] = route.split("/");
