@@ -630,9 +630,13 @@ function ReviewWorkspace({
   const [statusFilter, setStatusFilter] = useState("all");
   const [sort, setSort] = useState("newest");
   const [selectedWorkId, setSelectedWorkId] = useState("");
+  const [studentSearch, setStudentSearch] = useState("");
+  const [workSearch, setWorkSearch] = useState("");
   const studentWorks = buildReviewWorks(submissions, selectedStudent, selectedStudentId);
   const courses = Array.from(new Set(studentWorks.map((item) => item.course).filter(Boolean)));
+  const visibleStudents = (selectedGroup?.students || []).filter((student) => textMatches(studentSearch, `${student.name} ${student.email}`));
   const filteredWorks = studentWorks
+    .filter((item) => textMatches(workSearch, `${item.title} ${item.course} ${reviewStatusLabel(item.status)}`))
     .filter((item) => courseFilter === "all" || item.course === courseFilter)
     .filter((item) => statusFilter === "all" || item.status === statusFilter)
     .sort((a, b) => {
@@ -656,7 +660,7 @@ function ReviewWorkspace({
             {pending.length}
           </span>
         </div>
-        <div className="grid gap-3 xl:grid-cols-2">
+        <div className="grid max-h-[520px] gap-3 overflow-y-auto pr-1 xl:grid-cols-2">
           {pending.map((item) => (
             <SubmissionCard key={item.id} item={item} grade={grade} setGrade={setGrade} gradeSubmission={gradeSubmission} onAttemptReviewed={onAttemptReviewed} compact />
           ))}
@@ -668,7 +672,7 @@ function ReviewWorkspace({
         <aside className="panel space-y-5">
           <div>
             <h2 className="mb-3 font-bold">Группы</h2>
-            <div className="space-y-2">
+            <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
               {groups.map((group) => (
                 <button
                   key={group.id}
@@ -682,9 +686,13 @@ function ReviewWorkspace({
             </div>
           </div>
           <div>
-            <h2 className="mb-3 font-bold">Ученики</h2>
-            <div className="space-y-2">
-              {selectedGroup?.students.map((student) => (
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="font-bold">Ученики</h2>
+              <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-300">{visibleStudents.length}</span>
+            </div>
+            <input className="input mb-3" placeholder="Найти ученика" value={studentSearch} onChange={(event) => setStudentSearch(event.target.value)} />
+            <div className="max-h-96 space-y-2 overflow-y-auto pr-1">
+              {visibleStudents.map((student) => (
                 <button
                   key={student.id}
                   className={`w-full rounded-lg px-3 py-2 text-left text-sm transition ${selectedStudentId === student.id ? "bg-brand-600 text-white" : "bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700"}`}
@@ -694,6 +702,7 @@ function ReviewWorkspace({
                   <span className="text-xs opacity-80">{student.pending} на проверке</span>
                 </button>
               ))}
+              {visibleStudents.length === 0 && <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500 dark:bg-slate-800">Ученики не найдены.</p>}
             </div>
           </div>
         </aside>
@@ -709,7 +718,8 @@ function ReviewWorkspace({
                   </div>
                   <Link className="btn-secondary" to="/grades">Открыть журнал оценок</Link>
                 </div>
-                <div className="grid gap-3 md:grid-cols-3">
+                <div className="grid gap-3 lg:grid-cols-4">
+                  <input className="input" placeholder="Найти работу" value={workSearch} onChange={(event) => setWorkSearch(event.target.value)} />
                   <select className="input" value={courseFilter} onChange={(event) => setCourseFilter(event.target.value)}>
                     <option value="all">Все курсы</option>
                     {courses.map((course) => <option key={course} value={course}>{course}</option>)}
@@ -737,18 +747,23 @@ function ReviewWorkspace({
 
           <div className="grid gap-5 2xl:grid-cols-[340px_1fr]">
             <div className="panel space-y-3">
-              <h3 className="font-bold">Работы ученика</h3>
-              {filteredWorks.map((item) => (
-                <button
-                  key={item.id}
-                  className={`w-full rounded-lg border p-3 text-left transition ${selectedWork?.id === item.id ? "border-brand-500 bg-brand-50 dark:bg-brand-950" : "border-slate-200 hover:border-brand-300 dark:border-slate-700"}`}
-                  onClick={() => setSelectedWorkId(item.id)}
-                >
-                  <span className="block font-semibold">{item.title}</span>
-                  <span className="text-sm text-slate-500">{item.course} • {reviewStatusLabel(item.status)}</span>
-                </button>
-              ))}
-              {filteredWorks.length === 0 && <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-800">Работ по фильтрам нет.</p>}
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="font-bold">Работы ученика</h3>
+                <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-300">{filteredWorks.length}</span>
+              </div>
+              <div className="max-h-[620px] space-y-3 overflow-y-auto pr-1">
+                {filteredWorks.map((item) => (
+                  <button
+                    key={item.id}
+                    className={`w-full rounded-lg border p-3 text-left transition ${selectedWork?.id === item.id ? "border-brand-500 bg-brand-50 dark:bg-brand-950" : "border-slate-200 hover:border-brand-300 dark:border-slate-700"}`}
+                    onClick={() => setSelectedWorkId(item.id)}
+                  >
+                    <span className="block font-semibold">{item.title}</span>
+                    <span className="text-sm text-slate-500">{item.course} • {reviewStatusLabel(item.status)}</span>
+                  </button>
+                ))}
+                {filteredWorks.length === 0 && <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-800">Работ по фильтрам нет.</p>}
+              </div>
             </div>
 
             <div>
@@ -1013,6 +1028,10 @@ function reviewStatusLabel(status) {
     ACTIVE: "активно"
   };
   return labels[status] || status;
+}
+
+function textMatches(query, value) {
+  return value.toLowerCase().includes(query.trim().toLowerCase());
 }
 
 function reviewStatusClass(status) {

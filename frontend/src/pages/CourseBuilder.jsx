@@ -1,4 +1,4 @@
-import { ArrowLeft, ChevronDown, ChevronUp, FileText, ImagePlus, Pencil, Plus, Save, Video } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, FileText, ImagePlus, Pencil, Plus, Save, Search, Video } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import CourseCard from "../components/CourseCard.jsx";
@@ -68,6 +68,7 @@ export default function CourseBuilder() {
   const [bannerPreview, setBannerPreview] = useState("");
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [courseSearch, setCourseSearch] = useState("");
 
   const isEditing = Boolean(courseId);
   const isNew = courseId === "new";
@@ -112,6 +113,9 @@ export default function CourseBuilder() {
   }
 
   const groups = data?.groups || [];
+  const filteredCourses = (data?.courses || []).filter((course) =>
+    `${course.title} ${course.description} ${course.category}`.toLowerCase().includes(courseSearch.trim().toLowerCase())
+  );
   const students = useMemo(() => {
     const source = data?.users?.filter((item) => item.role === "STUDENT") || data?.groups?.flatMap((group) => group.students) || [];
     return Array.from(new Map(source.map((item) => [item.id, item])).values());
@@ -127,13 +131,19 @@ export default function CourseBuilder() {
             <h1 className="text-2xl font-bold">Конструктор курсов</h1>
             <p className="text-sm text-slate-500">Создавайте курсы, редактируйте материалы и управляйте доступом.</p>
           </div>
-          <Link className="btn-primary flex w-fit items-center gap-2" to="/courses/builder/new">
-            <Plus size={18} /> Создать новый курс
-          </Link>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <label className="relative">
+              <Search className="pointer-events-none absolute left-3 top-2.5 text-slate-400" size={18} />
+              <input className="input pl-10" placeholder="Найти курс" value={courseSearch} onChange={(event) => setCourseSearch(event.target.value)} />
+            </label>
+            <Link className="btn-primary flex w-fit items-center gap-2" to="/courses/builder/new">
+              <Plus size={18} /> Создать новый курс
+            </Link>
+          </div>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          {data.courses.map((course) => (
+        <div className="grid max-h-[calc(100vh-15rem)] gap-4 overflow-y-auto pr-1 lg:grid-cols-2">
+          {filteredCourses.map((course) => (
             <div key={course.id} className="relative">
               <CourseCard course={course} />
               <Link className="btn-secondary absolute right-4 top-4 flex items-center gap-2 bg-white/90 dark:bg-slate-950/90" to={`/courses/builder/${course.id}`}>
@@ -141,6 +151,7 @@ export default function CourseBuilder() {
               </Link>
             </div>
           ))}
+          {filteredCourses.length === 0 && <div className="panel text-sm text-slate-500 lg:col-span-2">Курсы не найдены.</div>}
         </div>
       </div>
     );

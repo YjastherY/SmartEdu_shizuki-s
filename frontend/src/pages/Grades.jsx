@@ -1,4 +1,4 @@
-import { Award, BookOpen, CheckCircle2, Clock3, ExternalLink } from "lucide-react";
+import { Award, BookOpen, CheckCircle2, Clock3, ExternalLink, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { api, assetUrl } from "../services/api.js";
@@ -128,6 +128,8 @@ function StaffGrades() {
   const [studentId, setStudentId] = useState("");
   const [courseFilter, setCourseFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [studentSearch, setStudentSearch] = useState("");
+  const [workSearch, setWorkSearch] = useState("");
 
   useEffect(() => {
     api("/teacher/overview").then((result) => {
@@ -141,12 +143,14 @@ function StaffGrades() {
   const groups = data?.groups || [];
   const selectedGroup = groups.find((group) => group.id === groupId) || groups[0];
   const selectedStudent = selectedGroup?.students.find((student) => student.id === studentId) || selectedGroup?.students[0];
+  const visibleStudents = (selectedGroup?.students || []).filter((student) => matches(studentSearch, `${student.name} ${student.email}`));
   const studentWorks = useMemo(() => buildStudentWorks(data, selectedStudent), [data, selectedStudent]);
   const courses = Array.from(new Set(studentWorks.map((work) => work.course).filter(Boolean)));
   const filteredWorks = studentWorks.filter((work) => {
     const matchesCourse = courseFilter === "all" || work.course === courseFilter;
     const matchesStatus = statusFilter === "all" || work.status === statusFilter;
-    return matchesCourse && matchesStatus;
+    const matchesText = matches(workSearch, `${work.title} ${work.course} ${work.details}`);
+    return matchesCourse && matchesStatus && matchesText;
   });
   const finalGrade = filteredWorks.length
     ? Math.round(filteredWorks.reduce((sum, work) => sum + (work.score || 0), 0) / filteredWorks.length)
@@ -165,7 +169,7 @@ function StaffGrades() {
         <aside className="panel space-y-5">
           <div>
             <h2 className="mb-3 font-bold">Группы</h2>
-            <div className="space-y-2">
+            <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
               {groups.map((group) => (
                 <button
                   key={group.id}
@@ -182,9 +186,16 @@ function StaffGrades() {
             </div>
           </div>
           <div>
-            <h2 className="mb-3 font-bold">Ученики</h2>
-            <div className="space-y-2">
-              {selectedGroup?.students.map((student) => (
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="font-bold">Ученики</h2>
+              <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-300">{visibleStudents.length}</span>
+            </div>
+            <label className="relative mb-3 block">
+              <Search className="pointer-events-none absolute left-3 top-2.5 text-slate-400" size={18} />
+              <input className="input pl-10" placeholder="Найти ученика" value={studentSearch} onChange={(event) => setStudentSearch(event.target.value)} />
+            </label>
+            <div className="max-h-96 space-y-2 overflow-y-auto pr-1">
+              {visibleStudents.map((student) => (
                 <button
                   key={student.id}
                   className={`w-full rounded-lg px-3 py-2 text-left text-sm transition ${selectedStudent?.id === student.id ? "bg-brand-600 text-white" : "bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700"}`}
@@ -193,6 +204,7 @@ function StaffGrades() {
                   {student.name}
                 </button>
               ))}
+              {visibleStudents.length === 0 && <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500 dark:bg-slate-800">Ученики не найдены.</p>}
             </div>
           </div>
         </aside>
@@ -213,7 +225,11 @@ function StaffGrades() {
               </div>
 
               <div className="panel space-y-4">
-                <div className="grid gap-3 md:grid-cols-2">
+                <div className="grid gap-3 md:grid-cols-3">
+                  <label className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-2.5 text-slate-400" size={18} />
+                    <input className="input pl-10" placeholder="Найти работу" value={workSearch} onChange={(event) => setWorkSearch(event.target.value)} />
+                  </label>
                   <select className="input" value={courseFilter} onChange={(event) => setCourseFilter(event.target.value)}>
                     <option value="all">Все курсы</option>
                     {courses.map((course) => <option key={course} value={course}>{course}</option>)}
@@ -225,7 +241,7 @@ function StaffGrades() {
                     <option value="SUBMITTED">Сдано</option>
                   </select>
                 </div>
-                <div className="overflow-x-auto">
+                <div className="max-h-[560px] overflow-auto">
                   <table className="w-full min-w-[820px] text-left text-sm">
                     <thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800 dark:text-slate-300">
                       <tr>
@@ -261,6 +277,10 @@ function StaffGrades() {
       </section>
     </div>
   );
+}
+
+function matches(query, value) {
+  return value.toLowerCase().includes(query.trim().toLowerCase());
 }
 
 function collectCourses(data) {

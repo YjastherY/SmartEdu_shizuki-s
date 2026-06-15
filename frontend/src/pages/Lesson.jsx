@@ -56,12 +56,15 @@ export default function Lesson() {
       </section>
       <aside className="space-y-4">
         <div className="panel">
-          <h2 className="mb-3 text-lg font-bold">Комментарии</h2>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-lg font-bold">Комментарии</h2>
+            <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-300">{lesson.comments.length}</span>
+          </div>
           <form className="flex gap-2" onSubmit={submitComment}>
             <input className="input" placeholder="Написать комментарий" value={comment} onChange={(event) => setComment(event.target.value)} />
             <button className="btn-primary px-3" aria-label="Отправить"><Send size={18} /></button>
           </form>
-          <div className="mt-4 space-y-3">
+          <div className="mt-4 max-h-[520px] space-y-3 overflow-y-auto pr-1">
             {lesson.comments.length === 0 && <p className="text-sm text-slate-500">Комментариев пока нет.</p>}
             {lesson.comments.map((item) => (
               <div key={item.id} className="rounded-lg bg-slate-50 p-3 text-sm transition hover:-translate-y-0.5 dark:bg-slate-800">

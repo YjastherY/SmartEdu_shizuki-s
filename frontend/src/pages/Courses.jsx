@@ -44,10 +44,11 @@ export default function Courses() {
       ) : (
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((course, index) => (
-            <div key={course.id} style={{ animationDelay: `${index * 70}ms` }} className="page-enter">
+            <div key={course.id} style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }} className="page-enter">
               <CourseCard course={course} />
             </div>
           ))}
+          {filtered.length === 0 && <div className="panel text-sm text-slate-500 md:col-span-2 xl:col-span-3">Курсы не найдены.</div>}
         </div>
       )}
     </div>

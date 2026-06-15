@@ -1,4 +1,4 @@
-import { BookOpen, Plus, ShieldCheck, UsersRound } from "lucide-react";
+import { BookOpen, Plus, Search, ShieldCheck, UsersRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../services/api.js";
@@ -7,6 +7,9 @@ export default function AdminPanel() {
   const [data, setData] = useState(null);
   const [groupDraft, setGroupDraft] = useState({ title: "", teacherId: "", studentIds: [], courseIds: [] });
   const [groupMessage, setGroupMessage] = useState("");
+  const [userSearch, setUserSearch] = useState("");
+  const [groupSearch, setGroupSearch] = useState("");
+  const [courseSearch, setCourseSearch] = useState("");
 
   useEffect(() => {
     api("/admin/overview").then(setData);
@@ -53,6 +56,9 @@ export default function AdminPanel() {
 
   const teachers = data.users.filter((user) => user.role === "TEACHER" || user.role === "ADMIN");
   const students = data.users.filter((user) => user.role === "STUDENT");
+  const filteredUsers = data.users.filter((user) => matches(userSearch, `${user.name} ${user.email} ${roleLabel(user.role)}`));
+  const filteredGroups = data.groups.filter((group) => matches(groupSearch, `${group.title} ${group.teacher?.name || ""}`));
+  const filteredCourses = data.courses.filter((course) => matches(courseSearch, `${course.title} ${course.category}`));
 
   return (
     <div className="page-enter space-y-6">
@@ -85,12 +91,18 @@ export default function AdminPanel() {
             <h2 className="text-xl font-bold">Менеджмент курсов</h2>
             <p className="text-sm text-slate-500">Создание и редактирование открываются в отдельном конструкторе.</p>
           </div>
-          <Link className="btn-primary flex w-fit items-center gap-2" to="/courses/builder/new">
-            <Plus size={18} /> Создать новый
-          </Link>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <label className="relative">
+              <Search className="pointer-events-none absolute left-3 top-2.5 text-slate-400" size={18} />
+              <input className="input pl-10" placeholder="Найти курс" value={courseSearch} onChange={(event) => setCourseSearch(event.target.value)} />
+            </label>
+            <Link className="btn-primary flex w-fit items-center gap-2" to="/courses/builder/new">
+              <Plus size={18} /> Создать новый
+            </Link>
+          </div>
         </div>
-        <div className="grid gap-3 lg:grid-cols-2">
-          {data.courses.map((course) => (
+        <div className="grid max-h-[460px] gap-3 overflow-y-auto pr-1 lg:grid-cols-2">
+          {filteredCourses.map((course) => (
             <div key={course.id} className="rounded-lg border border-slate-200 p-4 dark:border-slate-700">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
@@ -103,14 +115,24 @@ export default function AdminPanel() {
               </div>
             </div>
           ))}
+          {filteredCourses.length === 0 && <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-800">Курсы не найдены.</p>}
         </div>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <div className="panel">
-          <h2 className="mb-4 text-xl font-bold">Пользователи</h2>
-          <div className="space-y-3">
-            {data.users.map((user) => (
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-xl font-bold">Пользователи</h2>
+              <p className="text-sm text-slate-500">{filteredUsers.length} из {data.users.length}</p>
+            </div>
+            <label className="relative sm:w-64">
+              <Search className="pointer-events-none absolute left-3 top-2.5 text-slate-400" size={18} />
+              <input className="input pl-10" placeholder="Имя или email" value={userSearch} onChange={(event) => setUserSearch(event.target.value)} />
+            </label>
+          </div>
+          <div className="max-h-[680px] space-y-3 overflow-y-auto pr-1">
+            {filteredUsers.map((user) => (
               <div key={user.id} className="rounded-lg border border-slate-200 p-4 dark:border-slate-700">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
@@ -125,6 +147,7 @@ export default function AdminPanel() {
                 </div>
               </div>
             ))}
+            {filteredUsers.length === 0 && <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-800">Пользователи не найдены.</p>}
           </div>
         </div>
 
@@ -134,6 +157,10 @@ export default function AdminPanel() {
               <h2 className="text-xl font-bold">Группы</h2>
               <p className="text-sm text-slate-500">Создание групп, назначение преподавателей и студентов.</p>
             </div>
+            <label className="relative lg:w-72">
+              <Search className="pointer-events-none absolute left-3 top-2.5 text-slate-400" size={18} />
+              <input className="input pl-10" placeholder="Найти группу" value={groupSearch} onChange={(event) => setGroupSearch(event.target.value)} />
+            </label>
           </div>
           <form className="mb-5 rounded-lg border border-slate-200 p-4 dark:border-slate-700" onSubmit={createGroup}>
             <div className="grid gap-3">
@@ -158,8 +185,8 @@ export default function AdminPanel() {
               </div>
             </div>
           </form>
-          <div className="space-y-4">
-            {data.groups.map((group) => (
+          <div className="max-h-[760px] space-y-4 overflow-y-auto pr-1">
+            {filteredGroups.map((group) => (
               <div key={group.id} className="rounded-lg bg-slate-50 p-4 dark:bg-slate-800">
                 <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
@@ -170,7 +197,7 @@ export default function AdminPanel() {
                     {teachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}
                   </select>
                 </div>
-                <div className="grid gap-2 sm:grid-cols-2">
+                <div className="grid max-h-64 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
                   {students.map((student) => (
                     <label key={student.id} className="flex items-center gap-2 rounded-lg bg-white p-2 text-sm dark:bg-slate-900">
                       <input type="checkbox" checked={group.studentIds.includes(student.id)} onChange={() => toggleStudent(group, student.id)} />
@@ -180,11 +207,25 @@ export default function AdminPanel() {
                 </div>
               </div>
             ))}
+            {filteredGroups.length === 0 && <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-800">Группы не найдены.</p>}
           </div>
         </div>
       </section>
     </div>
   );
+}
+
+function matches(query, value) {
+  return value.toLowerCase().includes(query.trim().toLowerCase());
+}
+
+function roleLabel(role) {
+  const labels = {
+    STUDENT: "Студент",
+    TEACHER: "Преподаватель",
+    ADMIN: "Администратор"
+  };
+  return labels[role] || role;
 }
 
 function CheckList({ title, items, selected, onChange, getLabel }) {

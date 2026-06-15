@@ -131,7 +131,7 @@ export default function Chat() {
 
       <aside className="panel h-fit space-y-3">
         <h2 className="font-bold">Группы</h2>
-        <div className="space-y-2">
+        <div className="max-h-[520px] space-y-2 overflow-y-auto pr-1">
           {groups.map((group) => (
             <button
               key={group.id}
