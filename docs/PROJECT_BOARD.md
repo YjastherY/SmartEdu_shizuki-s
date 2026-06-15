@@ -29,7 +29,7 @@ This file represents the Trello/Jira-style board used for planning and review.
 | Task | Owner | Priority | Notes |
 | --- | --- | --- | --- |
 | Four-week plan mapping | All | High | Documented in `docs/PLAN_STATUS.md`. |
-| Smoke test evidence | QA/DevOps | High | `npm run smoke` checks auth, courses, content CRUD, chat, assistant, and WebSocket. |
+| Smoke test evidence | QA/DevOps | High | `npm run smoke` checks auth, courses, content CRUD, chat, and WebSocket. |
 
 ## Done
 
@@ -44,7 +44,5 @@ This file represents the Trello/Jira-style board used for planning and review.
 | Progress and certificates | Fullstack | High | Progress page and certificate endpoint. |
 | Notifications and WebSocket | Fullstack | High | `NotificationBell`, `realtime.js`. |
 | Live chat | Fullstack | Medium | `/chat`, chat API, WebSocket messages. |
-| Learning assistant | Fullstack | Medium | `/assistant`, assistant API. |
 | Teacher and admin dashboards | Fullstack | High | `/teacher`, `/admin`. |
 | Documentation package | All | High | README, QA, demo, plan status, board, presentation, retrospective. |
-

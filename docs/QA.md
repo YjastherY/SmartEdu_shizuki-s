@@ -35,7 +35,6 @@ This checklist covers the MVP flows required for SmartEdu acceptance testing.
 - Open notifications, read them, and confirm unread counter clears.
 - Open the chat page, send a message, refresh the page, and confirm the message remains.
 - Open the app in two browser sessions and confirm a chat message appears without refreshing.
-- Open the learning assistant, ask a course question, and confirm the answer includes course sources.
 
 ## Teacher Flows
 
@@ -82,7 +81,7 @@ This checklist covers the MVP flows required for SmartEdu acceptance testing.
 - Confirm `docker compose -f docker-compose.server.yml ps` shows all services running.
 - Confirm `GET /api/health` returns `{"status":"ok","service":"smartedu-api"}`.
 - Run `SMARTEDU_BASE_URL=http://localhost:3000 npm run smoke` from `backend`.
-- Confirm smoke output includes `content-crud`, `assistant`, and `websocket`.
+- Confirm smoke output includes `content-crud`, `chat`, and `websocket`.
 - Log in through the deployed frontend.
 - Open one student, teacher, and admin page.
 - Check backend logs and confirm requests include JSON fields such as `requestId`, `method`, `url`, `status`, and `responseTimeMs`.

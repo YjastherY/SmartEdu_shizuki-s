@@ -17,9 +17,7 @@
 
 ## Decisions
 
-- Telegram integration was deferred by project decision. In-app notifications and WebSocket updates are implemented.
 - Certificates are implemented as verifiable HTML pages. PDF export is left as a future improvement.
-- The learning assistant is deterministic and based on course/progress data, so the MVP works without a paid external AI API.
 - WebSocket is used for notifications and chat; REST fallbacks remain available.
 
 ## What To Improve Next
@@ -33,4 +31,3 @@
 ## Final Status
 
 The project is ready for MVP demonstration. Core functionality, advanced UX features, deployment, smoke testing, and documentation are in place.
-

@@ -568,45 +568,6 @@ function getBestScore(attempts) {
   return graded.length ? Math.max(...graded.map((attempt) => attempt.score)) : null;
 }
 
-function buildAssistantAnswer(state, question) {
-  const text = question.toLowerCase();
-  const progress = state.progress || [];
-  const attempts = state.attempts || [];
-  const completed = progress.reduce((sum, item) => sum + item.completedLessons, 0);
-  const total = progress.reduce((sum, item) => sum + item.totalLessons, 0);
-  const average = attempts.length
-    ? Math.round(attempts.reduce((sum, item) => sum + item.score, 0) / attempts.length)
-    : progress.length
-      ? Math.round(progress.reduce((sum, item) => sum + item.averageScore, 0) / progress.length)
-      : 0;
-  const isBackend = ["backend", "api", "express", "node", "jwt", "prisma"].some((item) => text.includes(item));
-  const isTest = ["тест", "балл", "оцен", "попыт", "дедлайн"].some((item) => text.includes(item));
-  const sourceCourse = isBackend ? courses[1] : courses[0];
-  const sourceLesson = sourceCourse.modules[0].lessons[isTest && sourceCourse.id === "course-1" ? 1 : 0];
-  const intro = isBackend
-    ? "По backend начни с цепочки request -> Express route -> Prisma -> PostgreSQL -> response."
-    : isTest
-      ? "Перед тестом проверь дедлайн, лимит попыток и вес каждого задания."
-      : "По React держи фокус на компонентах, props, состоянии и роутинге.";
-
-  return {
-    answer: `${intro} Рядом по материалам: «${sourceLesson.title}». ${total ? `Сейчас закрыто ${completed} из ${total} уроков, средний результат ${average}%.` : "Прогресс пока пустой, начни с первого урока."}`,
-    suggestions: [
-      "Что повторить перед тестом?",
-      "Объясни компоненты React",
-      "Как поднять прогресс?",
-      "Чем REST API отличается от обычной страницы?"
-    ],
-    sources: [
-      {
-        course: sourceCourse.title,
-        module: sourceCourse.modules[0].title,
-        lesson: sourceLesson.title
-      }
-    ]
-  };
-}
-
 function isNotificationForUser(notification, user) {
   if (notification.recipientId) return notification.recipientId === user.id;
   if (notification.audience) return notification.audience === user.role;
@@ -737,7 +698,6 @@ export async function mockApi(path, options = {}) {
     saveState(state);
     return { message };
   }
-  if (route === "/assistant/ask") return buildAssistantAnswer(state, body.question || "");
   if (route === "/courses" && (!options.method || options.method === "GET")) return { courses: visibleCoursesForUser(state.user) };
   if (route === "/courses" && options.method === "POST") {
     const course = {

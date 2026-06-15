@@ -38,8 +38,6 @@ jobs:
         working-directory: backend
       - run: node --check src/routes/lessons.js
         working-directory: backend
-      - run: node --check src/routes/assistant.js
-        working-directory: backend
       - run: node --check src/logger.js
         working-directory: backend
       - run: node --check scripts/smoke.js

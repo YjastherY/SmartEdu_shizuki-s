@@ -6,7 +6,7 @@ This document maps the original four-week assignment to the implemented MVP.
 
 | Plan item | Status | Evidence |
 | --- | --- | --- |
-| React project and routing | Done | `frontend/src/App.jsx` routes login, register, dashboard, courses, lessons, profile, progress, assistant, chat, teacher, and admin pages. |
+| React project and routing | Done | `frontend/src/App.jsx` routes login, register, dashboard, courses, lessons, profile, progress, grades, chat, teacher, course builder, and admin pages. |
 | Backend server structure | Done | `backend/src/server.js` mounts Express routes under `/api`. |
 | Docker setup and environments | Done | `docker-compose.yml`, `docker-compose.server.yml`, `.env.server.example`, `backend/.env.example`, `frontend/.env.example`. |
 | Trello/Jira planning board | Done | `docs/PROJECT_BOARD.md` contains a Kanban-style board with backlog, review, and done columns. |
@@ -61,10 +61,8 @@ This document maps the original four-week assignment to the implemented MVP.
 
 | Extra item | Status | Evidence |
 | --- | --- | --- |
-| AI learning assistant | Done | `/assistant`, `POST /api/assistant/ask`. |
 | Student online chat | Done | `/chat`, REST history, WebSocket realtime messages. |
 | Certificate system | Done | Certificate records and `GET /api/certificates/:code` HTML verification page. |
-| Telegram integration | Deferred | Removed by project decision; in-app and WebSocket notifications remain implemented. |
 
 ## Verification Commands
 

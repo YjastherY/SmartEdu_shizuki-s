@@ -49,7 +49,6 @@ SmartEdu combines course catalog, lessons, tests, progress analytics, comments, 
 
 - WebSocket notifications
 - Live student chat
-- Learning assistant
 - Dark theme
 - Responsive interface
 - Certificate verification page
@@ -83,4 +82,3 @@ The four-week MVP plan is implemented and mapped in `docs/PLAN_STATUS.md`.
 - More automated integration tests
 - HTTPS and domain setup
 - More detailed analytics
-
