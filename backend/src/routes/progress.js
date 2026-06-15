@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { authRequired } from "../middleware/auth.js";
 import { prisma } from "../prisma.js";
+import { ensureCompletedCourseCertificates } from "../services/certificates.js";
 import { asyncHandler } from "../utils.js";
 
 const router = Router();
@@ -14,6 +15,7 @@ router.get(
       include: { course: true },
       orderBy: { updatedAt: "desc" }
     });
+    await ensureCompletedCourseCertificates(req.user.id, progress);
     const certificates = await prisma.certificate.findMany({
       where: { userId: req.user.id },
       include: { course: true },

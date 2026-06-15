@@ -3,6 +3,7 @@ import { z } from "zod";
 import { authRequired } from "../middleware/auth.js";
 import { prisma } from "../prisma.js";
 import { sendNotification } from "../realtime.js";
+import { ensureCourseCertificate } from "../services/certificates.js";
 import { asyncHandler } from "../utils.js";
 
 const router = Router();
@@ -194,18 +195,7 @@ router.post(
       create: { userId: req.user.id, lessonId: test.lessonId }
     });
     const progress = await updateCourseProgress(req.user.id, test.lesson.module.courseId);
-
-    if (progress.percent >= 100) {
-      await prisma.certificate.upsert({
-        where: { code: `${req.user.id}-${test.lesson.module.courseId}` },
-        update: {},
-        create: {
-          userId: req.user.id,
-          courseId: test.lesson.module.courseId,
-          code: `${req.user.id}-${test.lesson.module.courseId}`
-        }
-      });
-    }
+    await ensureCourseCertificate(req.user.id, test.lesson.module.courseId, progress);
 
     const attempts = await prisma.testAttempt.findMany({
       where: { userId: req.user.id, testId: test.id },

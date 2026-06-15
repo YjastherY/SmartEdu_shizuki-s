@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { authRequired, teacherOrAdmin } from "../middleware/auth.js";
 import { prisma } from "../prisma.js";
+import { ensureCourseCertificate } from "../services/certificates.js";
 import { asyncHandler } from "../utils.js";
 
 const router = Router();
@@ -258,6 +259,7 @@ router.post(
     });
 
     const progress = await refreshProgress(req.user.id, lesson.module.courseId);
+    await ensureCourseCertificate(req.user.id, lesson.module.courseId, progress);
     res.json({ progress });
   })
 );

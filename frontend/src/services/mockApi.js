@@ -484,7 +484,36 @@ function updateProgress(state, courseId) {
     course
   };
   state.progress = [nextProgress, ...state.progress.filter((item) => item.courseId !== courseId)];
+  ensureCertificate(state, course, nextProgress);
   return nextProgress;
+}
+
+function ensureCertificate(state, course, progress) {
+  if (!course || progress.percent < 100) return null;
+  const existing = state.certificates.find((item) => item.courseId === course.id);
+  if (existing) return existing;
+
+  const certificate = {
+    id: `certificate-${course.id}`,
+    courseId: course.id,
+    course,
+    code: `SE-${new Date().getFullYear()}-${course.id.toUpperCase()}`,
+    issuedAt: new Date().toISOString()
+  };
+  state.certificates = [certificate, ...state.certificates];
+  state.notifications = [
+    {
+      id: `notification-certificate-${course.id}`,
+      title: "Сертификат готов",
+      message: `Вы получили сертификат за курс «${course.title}».`,
+      type: "certificate",
+      targetPath: "/progress",
+      read: false,
+      createdAt: new Date().toISOString()
+    },
+    ...state.notifications
+  ];
+  return certificate;
 }
 
 function getQuestionPoints(question) {
@@ -924,6 +953,8 @@ export async function mockApi(path, options = {}) {
     };
   }
   if (route === "/progress/me") {
+    state.progress.forEach((progress) => ensureCertificate(state, progress.course, progress));
+    saveState(state);
     return { progress: state.progress, certificates: state.certificates, attempts: state.attempts.map(enrichAttempt) };
   }
   if (route === "/comments") {

@@ -1,7 +1,7 @@
-import { Award, BookOpen, CheckCircle2, Clock3 } from "lucide-react";
+import { Award, BookOpen, CheckCircle2, Clock3, ExternalLink } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
-import { api } from "../services/api.js";
+import { api, assetUrl } from "../services/api.js";
 
 export default function Grades() {
   const { user } = useAuth();
@@ -10,7 +10,7 @@ export default function Grades() {
 }
 
 function StudentGrades() {
-  const [data, setData] = useState({ progress: [], attempts: [] });
+  const [data, setData] = useState({ progress: [], certificates: [], attempts: [] });
   const [courseId, setCourseId] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -26,6 +26,7 @@ function StudentGrades() {
   const courses = useMemo(() => collectCourses(data), [data]);
   const selectedCourse = courses.find((course) => course.id === courseId) || courses[0];
   const rows = useMemo(() => buildRows(data.attempts, selectedCourse?.id), [data.attempts, selectedCourse?.id]);
+  const certificate = data.certificates.find((item) => item.courseId === selectedCourse?.id);
   const finalGrade = rows.length ? Math.round(rows.reduce((sum, row) => sum + (row.countedScore ?? 0), 0) / rows.length) : 0;
   const pendingCount = rows.filter((row) => row.status === "PENDING_REVIEW").length;
 
@@ -51,6 +52,30 @@ function StudentGrades() {
             <SummaryCard icon={Award} label="Итоговая" value={`${finalGrade}%`} tone="brand" />
             <SummaryCard icon={CheckCircle2} label="Засчитано работ" value={rows.filter((row) => row.status === "GRADED").length} tone="emerald" />
             <SummaryCard icon={Clock3} label="На проверке" value={pendingCount} tone="amber" />
+          </section>
+
+          <section className={`panel flex flex-col gap-4 border ${certificate ? "border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100" : "border-slate-200 dark:border-slate-800"}`}>
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-start gap-3">
+                <Award className={certificate ? "text-amber-500" : "text-slate-400"} />
+                <div>
+                  <h2 className="font-bold">Сертификат курса</h2>
+                  <p className="text-sm opacity-80">
+                    {certificate ? `Получен. Код: ${certificate.code}` : "Откроется после полного прохождения курса."}
+                  </p>
+                </div>
+              </div>
+              {certificate && (
+                <a
+                  className="btn-secondary inline-flex items-center justify-center gap-2"
+                  href={assetUrl(`/api/certificates/${encodeURIComponent(certificate.code)}`)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Открыть сертификат <ExternalLink size={16} />
+                </a>
+              )}
+            </div>
           </section>
 
           <section className="panel overflow-hidden">
