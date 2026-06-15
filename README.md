@@ -10,6 +10,13 @@ SmartEdu is an MVP educational platform for online courses, video lessons, tests
 - Auth: JWT
 - Deployment: Docker Compose
 
+## Requirements
+
+- Node.js 22+
+- npm
+- Docker and Docker Compose
+- Git
+
 ## Features
 
 - Student registration and login
@@ -53,7 +60,33 @@ SmartEdu is an MVP educational platform for online courses, video lessons, tests
 └── docker-compose.server.yml
 ```
 
+## Quick Start With Docker
+
+This is the easiest way to review the complete MVP locally:
+
+```bash
+git clone git@github.com:YjastherY/SmartEdu_shizuki-s.git
+cd SmartEdu_shizuki-s
+cp .env.server.example .env
+docker compose -f docker-compose.server.yml up -d --build
+docker compose -f docker-compose.server.yml exec backend npm run prisma:seed
+```
+
+Open the application:
+
+```text
+http://localhost:3000
+```
+
+Check the API:
+
+```text
+http://localhost:3000/api/health
+```
+
 ## Local Setup
+
+Use this mode when developing frontend and backend separately.
 
 Start PostgreSQL:
 
@@ -82,6 +115,7 @@ Start the frontend:
 
 ```bash
 cd frontend
+cp .env.example .env
 npm install
 npm run dev
 ```
@@ -120,6 +154,8 @@ Seed demo data after the containers start:
 docker compose -f docker-compose.server.yml exec backend npm run prisma:seed
 ```
 
+Uploaded avatars and videos are stored in the Docker volume `smartedu_uploads`, so files persist after container rebuilds.
+
 Default Docker URLs:
 
 ```text
@@ -142,6 +178,12 @@ Run an automated smoke test against Docker or a deployed server:
 ```bash
 cd backend
 SMARTEDU_BASE_URL=http://localhost:3000 npm run smoke
+```
+
+Expected result:
+
+```json
+{"status":"ok","checks":["health","auth","courses","progress","teacher","admin","access-control","content-crud","chat","websocket"]}
 ```
 
 Update an existing deployment:
