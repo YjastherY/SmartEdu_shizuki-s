@@ -19,8 +19,8 @@ async function createCode() {
 export async function ensureCourseCertificate(userId, courseId, progress) {
   if (!progress || progress.percent < 100) return null;
 
-  const existing = await prisma.certificate.findUnique({
-    where: { userId_courseId: { userId, courseId } },
+  const existing = await prisma.certificate.findFirst({
+    where: { userId, courseId },
     include: { course: true }
   });
   if (existing) return existing;

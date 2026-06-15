@@ -9,9 +9,7 @@ async function main() {
 
   let issued = 0;
   for (const progress of completedProgress) {
-    const before = await prisma.certificate.findUnique({
-      where: { userId_courseId: { userId: progress.userId, courseId: progress.courseId } }
-    });
+    const before = await prisma.certificate.findFirst({ where: { userId: progress.userId, courseId: progress.courseId } });
     await ensureCourseCertificate(progress.userId, progress.courseId, progress);
     if (!before) issued += 1;
   }
